@@ -78,14 +78,11 @@ cp environments/prod/terraform.tfvars.example terraform.tfvars
 
 ### 3. Update Configuration
 
-Edit `terraform.tfvars` and update the following required values:
+Edit `terraform.tfvars` and update the required values:
 
 ```hcl
-# Change these values!
-name_prefix        = "your-project-name"
-litellm_master_key = "sk-your-secure-master-key"
-litellm_salt_key   = "your-secure-salt-key-32-chars"
-database_password  = "your-secure-database-password"
+# Required values to configure
+name_prefix = "your-project-name"
 
 # Update tags
 default_tags = {
@@ -93,6 +90,10 @@ default_tags = {
   Project     = "your-project"
   Owner       = "your-team"
 }
+
+# Secrets are auto-generated - no manual input needed!
+# LiteLLM master key, salt key, and database password are 
+# automatically generated using Terraform's random provider
 ```
 
 ### 4. Deploy Infrastructure
@@ -110,18 +111,26 @@ terraform apply
 
 ### 5. Access LiteLLM
 
-After deployment, get the ALB URL:
+After deployment, get the ALB URL and auto-generated master key:
 
 ```bash
+# Get the load balancer URL
 terraform output alb_url
+
+# Get the auto-generated master key
+terraform output -raw litellm_master_key
 ```
 
 Test the deployment:
 
 ```bash
+# Store the master key in a variable
+MASTER_KEY=$(terraform output -raw litellm_master_key)
+
+# Test the API
 curl -X POST "$(terraform output -raw alb_url)/v1/chat/completions" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-secure-master-key" \
+  -H "Authorization: Bearer $MASTER_KEY" \
   -d '{
     "model": "gpt-3.5-turbo",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -145,6 +154,7 @@ Development environment features:
 - Smaller RDS instance (`db.t3.micro`)
 - No deletion protection
 - ECS Exec enabled for debugging
+- Auto-generated secrets unique to dev environment
 
 ### Production Environment
 
@@ -162,6 +172,7 @@ Production environment features:
 - Deletion protection enabled
 - Enhanced monitoring
 - Restricted network access
+- Auto-generated secrets unique to production environment
 
 ### Multiple Environments
 
@@ -205,6 +216,24 @@ additional_ssm_parameters = {
 }
 ```
 
+### Secret Management
+
+All core secrets are automatically generated:
+
+- **LiteLLM Master Key**: Format `sk-{48 alphanumeric chars}` - auto-generated
+- **LiteLLM Salt Key**: 32-byte base64-encoded key for AES-256 - auto-generated  
+- **Database Password**: 32-char RDS-compliant password - auto-generated
+
+Retrieve secrets after deployment:
+
+```bash
+# Get master key for API authentication
+terraform output -raw litellm_master_key
+
+# Get SSM parameter names for external access
+terraform output secret_retrieval_commands
+```
+
 ### Scaling Configuration
 
 Configure ECS autoscaling:
@@ -239,9 +268,11 @@ db_backup_retention_period = 30
 
 ### Secrets Management
 
-- Database passwords stored in SSM Parameter Store
-- LiteLLM API keys stored as SecureString parameters
+- All secrets auto-generated using Terraform random provider
+- Database passwords, LiteLLM keys stored in SSM Parameter Store as SecureString
+- Secrets are unique per environment and cryptographically secure
 - IAM roles follow principle of least privilege
+- No manual secret management required
 
 ### Access Control
 
