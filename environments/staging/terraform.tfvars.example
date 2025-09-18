@@ -68,12 +68,63 @@ environment_variables = {
   LITELLM_DROP_PARAMS = "true"
 }
 
-# Additional SSM Parameters (optional)
+# Additional SSM Parameters - API Keys and Configuration
 additional_ssm_parameters = {
-  # Example: Add OpenAI API key
-  # "openai-api-key" = {
-  #   value       = "sk-your-openai-api-key"
+  # Model Provider API Keys (Required for respective models)
+  "openai-api-key" = {
+    value       = "sk-proj-your-openai-api-key-here"
+    type        = "SecureString"
+    description = "OpenAI API Key for GPT models"
+  }
+  "anthropic-api-key" = {
+    value       = "sk-ant-your-anthropic-api-key-here"
+    type        = "SecureString"
+    description = "Anthropic API Key for Claude models"
+  }
+  "azure-api-key" = {
+    value       = "your-azure-openai-api-key"
+    type        = "SecureString"
+    description = "Azure OpenAI API Key"
+  }
+  "azure-api-base" = {
+    value       = "https://your-resource.openai.azure.com/"
+    type        = "String"
+    description = "Azure OpenAI API Base URL"
+  }
+  "google-api-key" = {
+    value       = "your-google-api-key"
+    type        = "SecureString"
+    description = "Google API Key for Gemini models"
+  }
+  
+  # Optional: Redis Configuration (for caching and routing)
+  # "redis-host" = {
+  #   value       = "your-redis-host.cache.amazonaws.com"
+  #   type        = "String"
+  #   description = "Redis host for caching"
+  # }
+  # "redis-password" = {
+  #   value       = "your-redis-password"
   #   type        = "SecureString"
-  #   description = "OpenAI API Key for LiteLLM"
+  #   description = "Redis password"
+  # }
+  
+  # Optional: Slack Integration (for alerts)
+  # "slack-webhook-url" = {
+  #   value       = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  #   type        = "SecureString"
+  #   description = "Slack webhook URL for alerts"
+  # }
+  
+  # Optional: Langfuse Integration (for observability)
+  # "langfuse-public-key" = {
+  #   value       = "pk-lf-your-public-key"
+  #   type        = "String"
+  #   description = "Langfuse public key"
+  # }
+  # "langfuse-secret-key" = {
+  #   value       = "sk-lf-your-secret-key"
+  #   type        = "SecureString"
+  #   description = "Langfuse secret key"
   # }
 }
