@@ -103,7 +103,15 @@ curl -X POST "$ALB_URL/v1/models" \
 
 ### Step 4: Configure LiteLLM Models
 
-1. Add your API keys to SSM Parameter Store:
+The deployment automatically uploads the configuration file from `examples/litellm-config.yaml` to S3. To customize:
+
+1. **Edit the configuration file:**
+```bash
+# Edit the LiteLLM configuration
+nano examples/litellm-config.yaml
+```
+
+2. **Add your API keys to SSM Parameter Store:**
 ```bash
 # Example: Add OpenAI API key
 aws ssm put-parameter \
@@ -113,7 +121,20 @@ aws ssm put-parameter \
   --description "OpenAI API Key for LiteLLM"
 ```
 
-2. Update the ECS task definition to include the new environment variables or restart the service to pick up new SSM parameters.
+3. **Deploy configuration changes:**
+```bash
+# This uploads the new config and triggers ECS redeployment
+terraform apply
+```
+
+4. **Verify configuration deployment:**
+```bash
+# Check the S3 configuration location
+terraform output config_s3_uri
+
+# Verify ECS tasks are using new configuration
+aws ecs describe-services --cluster $(terraform output -raw ecs_cluster_name) --services $(terraform output -raw ecs_service_name)
+```
 
 ### Step 5: Access Generated Secrets
 
@@ -226,9 +247,49 @@ terraform init && terraform apply
 
 ## Configuration Management
 
+### Updating LiteLLM Configuration
+
+The primary method for configuring LiteLLM is through the configuration file:
+
+1. **Edit Configuration File:**
+```bash
+# Edit the main configuration
+nano examples/litellm-config.yaml
+
+# Add new models, change settings, update configurations
+```
+
+2. **Deploy Changes:**
+```bash
+# Upload new config and trigger rolling deployment
+terraform apply
+
+# Changes are automatically deployed with zero downtime
+```
+
 ### Adding Model Providers
 
-To add new model providers, update the SSM parameters:
+#### Method 1: Configuration File (Recommended)
+Edit `examples/litellm-config.yaml`:
+
+```yaml
+model_list:
+  # Add new models
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+  
+  - model_name: azure-gpt-4o
+    litellm_params:
+      model: azure/gpt-4o
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: "2024-02-01"
+```
+
+#### Method 2: SSM Parameters
+Add API keys via SSM Parameter Store:
 
 ```bash
 # Add Anthropic API key
@@ -247,6 +308,11 @@ aws ssm put-parameter \
   --name "/your-prefix/litellm/azure-api-base" \
   --value "https://your-resource.openai.azure.com/" \
   --type "String"
+```
+
+Then deploy the configuration:
+```bash
+terraform apply
 ```
 
 ### Scaling Configuration
@@ -268,6 +334,19 @@ terraform apply
 
 ## Monitoring and Maintenance
 
+### Configuration File Management
+
+```bash
+# View current configuration in S3
+aws s3 cp $(terraform output -raw config_s3_uri) - 
+
+# List configuration versions
+aws s3api list-object-versions --bucket $(terraform output -raw config_bucket_name) --prefix litellm-config.yaml
+
+# Download a specific version
+aws s3api get-object --bucket $(terraform output -raw config_bucket_name) --key litellm-config.yaml --version-id VERSION_ID config.yaml
+```
+
 ### Viewing Logs
 
 ```bash
@@ -278,6 +357,11 @@ aws logs tail $(terraform output -raw ecs_log_group_name) --follow
 aws logs filter-log-events \
   --log-group-name $(terraform output -raw ecs_log_group_name) \
   --start-time $(date -d '1 hour ago' +%s)000
+
+# Check for configuration-related errors
+aws logs filter-log-events \
+  --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --filter-pattern "config"
 ```
 
 ### Health Monitoring
@@ -313,16 +397,24 @@ aws rds describe-db-log-files \
    - Check CloudWatch logs for error messages
    - Verify SSM parameters are accessible
    - Check security group configurations
+   - Ensure S3 config file is accessible and valid
 
-2. **Database Connection Issues**
+2. **Configuration File Issues**
+   - Verify config file syntax is valid YAML
+   - Check S3 bucket permissions for ECS task role
+   - Ensure config file exists in S3 bucket
+   - Review environment variables for S3 bucket/key names
+
+3. **Database Connection Issues**
    - Verify security group allows connections from ECS
    - Check database endpoint and credentials
    - Ensure database is in available state
 
-3. **Load Balancer Health Checks Failing**
+4. **Load Balancer Health Checks Failing**
    - Verify the health check path is correct
    - Check that the application is listening on the correct port
    - Review security group rules
+   - Ensure config file is properly loaded
 
 ### Getting Help
 
@@ -340,6 +432,14 @@ aws ecs describe-services \
   --cluster $(terraform output -raw ecs_cluster_name) \
   --services $(terraform output -raw ecs_service_name) \
   --query 'services[0].events[:5]'
+
+# Verify configuration file in container
+aws ecs execute-command \
+  --cluster $(terraform output -raw ecs_cluster_name) \
+  --task TASK_ID \
+  --container litellm \
+  --interactive \
+  --command "cat /app/config.yaml"
 ```
 
 ## Cleanup

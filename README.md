@@ -7,9 +7,10 @@ This repository contains a modular Terraform configuration for deploying [LiteLL
 The deployment creates the following AWS resources:
 
 - **VPC**: Custom VPC with public, private, and database subnets across multiple AZs
-- **ECS**: Fargate cluster running the LiteLLM container
+- **ECS**: Fargate cluster running the LiteLLM container with auto-scaling
 - **RDS**: PostgreSQL database for LiteLLM data persistence
 - **ALB**: Application Load Balancer for traffic distribution
+- **S3**: Configuration storage bucket for LiteLLM config file
 - **SSM**: Parameter Store for secure secrets management
 - **IAM**: Roles and policies for secure access
 - **Security Groups**: Network security rules for each component
@@ -25,7 +26,8 @@ The deployment creates the following AWS resources:
 │   ├── ssm/                   # SSM Parameter Store
 │   ├── rds/                   # PostgreSQL database
 │   ├── alb/                   # Application Load Balancer
-│   └── ecs/                   # ECS cluster and service
+│   ├── ecs/                   # ECS cluster and service
+│   └── s3-config/             # S3 bucket for configuration storage
 ├── environments/              # Environment-specific configurations
 │   ├── dev/
 │   ├── staging/
@@ -119,6 +121,9 @@ terraform output alb_url
 
 # Get the auto-generated master key
 terraform output -raw litellm_master_key
+
+# Check configuration bucket
+terraform output config_s3_uri
 ```
 
 Test the deployment:
@@ -127,12 +132,15 @@ Test the deployment:
 # Store the master key in a variable
 MASTER_KEY=$(terraform output -raw litellm_master_key)
 
-# Test the API
+# Test the health endpoint
+curl "$(terraform output -raw alb_url)/health"
+
+# Test the API with a configured model
 curl -X POST "$(terraform output -raw alb_url)/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $MASTER_KEY" \
   -d '{
-    "model": "gpt-3.5-turbo",
+    "model": "gpt-4o",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -196,17 +204,50 @@ terraform apply -var-file="environments/prod/terraform.tfvars"
 
 ### LiteLLM Configuration
 
-The deployment supports various LiteLLM configurations through environment variables and SSM parameters:
+The deployment supports LiteLLM configuration through multiple methods:
+
+#### 1. Configuration File (Primary Method)
+The main configuration is managed via `examples/litellm-config.yaml`:
+
+```yaml
+# examples/litellm-config.yaml
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  set_verbose: false
+  json_logs: true
+```
+
+**Update workflow:**
+```bash
+# 1. Edit the config file
+nano examples/litellm-config.yaml
+
+# 2. Deploy changes (automatically uploads to S3 and redeploys ECS)
+terraform apply
+```
+
+#### 2. Environment Variables
+Additional runtime configuration via terraform.tfvars:
 
 ```hcl
-# In terraform.tfvars
 environment_variables = {
   LITELLM_LOG_LEVEL     = "INFO"
   LITELLM_DROP_PARAMS   = "true"
   LITELLM_REQUEST_TIMEOUT = "600"
 }
+```
 
-# Add API keys via SSM
+#### 3. API Keys via SSM
+Add provider API keys securely:
+
+```hcl
 additional_ssm_parameters = {
   "openai-api-key" = {
     value       = "sk-your-openai-api-key"
@@ -232,7 +273,19 @@ terraform output -raw litellm_master_key
 
 # Get SSM parameter names for external access
 terraform output secret_retrieval_commands
+
+# View configuration file location
+terraform output config_s3_uri
 ```
+
+### Configuration Management
+
+The deployment includes automated configuration management:
+
+- **S3 Storage**: Configuration file stored in versioned S3 bucket
+- **Automatic Updates**: Config changes trigger ECS redeployment
+- **Zero Downtime**: Rolling updates when configuration changes
+- **Version Control**: Git tracks config changes, S3 provides file versioning
 
 ### Scaling Configuration
 
