@@ -87,7 +87,7 @@ echo "✅ DynamoDB table created: $DYNAMODB_TABLE"
 cp examples/backend.tf.example backend.tf
 
 # Edit with your actual resource names
-nano backend.tf
+vim backend.tf
 # Update bucket and dynamodb_table values with your generated names
 ```
 
@@ -112,7 +112,7 @@ terraform workspace list
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
 
 # Edit with your specific values
-nano environments/dev/terraform.tfvars
+vim environments/dev/terraform.tfvars
 ```
 
 4. Update the configuration file:
@@ -206,7 +206,7 @@ The deployment automatically uploads the configuration file from `examples/litel
 1. **Edit the configuration file:**
 ```bash
 # Edit the LiteLLM configuration
-nano examples/litellm-config.yaml
+vim examples/litellm-config.yaml
 ```
 
 2. **Add your API keys to SSM Parameter Store:**
@@ -264,7 +264,7 @@ terraform workspace select dev
 
 # Configure development environment
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
-nano environments/dev/terraform.tfvars
+vim environments/dev/terraform.tfvars
 
 # Deploy to development
 terraform plan -var-file="environments/dev/terraform.tfvars"
@@ -288,7 +288,7 @@ terraform workspace select prod
 
 # Configure production environment
 cp environments/prod/terraform.tfvars.example environments/prod/terraform.tfvars
-nano environments/prod/terraform.tfvars
+vim environments/prod/terraform.tfvars
 
 # Deploy to production
 terraform plan -var-file="environments/prod/terraform.tfvars"
@@ -359,7 +359,7 @@ The primary method for configuring LiteLLM is through the configuration file:
 1. **Edit Configuration File:**
 ```bash
 # Edit the main configuration
-nano examples/litellm-config.yaml
+vim examples/litellm-config.yaml
 
 # Add new models, change settings, update configurations
 ```

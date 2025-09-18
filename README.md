@@ -30,11 +30,22 @@ The deployment creates the following AWS resources:
 │   └── s3-config/             # S3 bucket for configuration storage
 ├── environments/              # Environment-specific configurations
 │   ├── dev/
+│   │   ├── terraform.tfvars.example
+│   │   └── .gitignore
 │   ├── staging/
+│   │   ├── terraform.tfvars.example
+│   │   └── .gitignore
 │   └── prod/
+│       ├── terraform.tfvars.example
+│       └── .gitignore
+├── examples/                  # Example configurations and templates
+│   ├── backend.tf.example     # Backend configuration template
+│   └── litellm-config.yaml    # LiteLLM configuration file
 ├── main.tf                    # Main Terraform configuration
 ├── variables.tf               # Input variables
 ├── outputs.tf                 # Output values
+├── backend.tf                 # Backend configuration (gitignored)
+├── .gitignore                 # Git ignore rules
 └── README.md                  # This file
 ```
 
@@ -52,6 +63,7 @@ Your AWS credentials need permissions to create and manage:
 - ECS Cluster, Service, Task Definition
 - RDS Instance, DB Subnet Group, Parameter Group
 - Application Load Balancer, Target Group, Listener
+- S3 Bucket and Objects (for configuration storage)
 - IAM Roles and Policies
 - SSM Parameters
 - Security Groups
@@ -141,7 +153,7 @@ terraform workspace new dev
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
 
 # Edit with your specific values
-nano environments/dev/terraform.tfvars
+vim environments/dev/terraform.tfvars
 ```
 
 Update the configuration with your values:
@@ -249,7 +261,7 @@ terraform workspace select dev
 
 # Configure development environment
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
-nano environments/dev/terraform.tfvars
+vim environments/dev/terraform.tfvars
 
 # Deploy with cost optimizations
 terraform plan -var-file="environments/dev/terraform.tfvars"
@@ -271,7 +283,7 @@ terraform workspace select prod
 
 # Configure production environment
 cp environments/prod/terraform.tfvars.example environments/prod/terraform.tfvars
-nano environments/prod/terraform.tfvars
+vim environments/prod/terraform.tfvars
 
 # Deploy with high availability
 terraform plan -var-file="environments/prod/terraform.tfvars"
@@ -333,7 +345,7 @@ general_settings:
 **Update workflow:**
 ```bash
 # 1. Edit the config file
-nano examples/litellm-config.yaml
+vim examples/litellm-config.yaml
 
 # 2. Deploy changes (automatically uploads to S3 and redeploys ECS)
 terraform apply

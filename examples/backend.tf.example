@@ -2,16 +2,14 @@
 # This file configures remote state storage for the LiteLLM infrastructure
 # This file is ignored by version control
 terraform {
-  # Uncomment and configure one of the backend options below
-
-  # Option 1: AWS S3 Backend with DynamoDB locking (Recommended for AWS deployments)
-  # backend "s3" {
-  #   bucket         = "your-terraform-state-bucket"           # Replace with your S3 bucket name
-  #   key            = "litellm-infra/terraform.tfstate"       # State file path in bucket
-  #   region         = "us-west-2"                             # AWS region for the bucket
-  #   encrypt        = true                                    # Encrypt state file
-  #   dynamodb_table = "terraform-lock-table"                 # DynamoDB table for state locking
-  # }
+  # AWS S3 Backend with DynamoDB locking (Recommended)
+  backend "s3" {
+    bucket         = "your-terraform-state-bucket"           # Replace with your S3 bucket name
+    key            = "litellm-infra/terraform.tfstate"       # State file path in bucket
+    region         = "us-east-1"                             # AWS region for the bucket
+    encrypt        = true                                    # Encrypt state file
+    dynamodb_table = "your-terraform-lock-table"            # DynamoDB table for state locking
+  }
 
   # Option 2: Terraform Cloud (Recommended for teams)
   # cloud {

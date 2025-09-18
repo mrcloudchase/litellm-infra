@@ -49,4 +49,3 @@ pids
 # Temporary files
 *.tmp
 *.temp
-backend.tf
