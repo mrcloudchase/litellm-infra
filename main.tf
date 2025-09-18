@@ -56,7 +56,7 @@ locals {
   
   # Format-compliant secrets
   litellm_master_key = "sk-${random_string.litellm_master_key_suffix.result}"
-  litellm_salt_key   = base64encode(random_bytes.litellm_salt_key.result)
+  litellm_salt_key   = random_bytes.litellm_salt_key.base64
   
   # Generate database URL with auto-generated password
   database_url = "postgresql://${module.rds.db_instance_username}:${random_password.database_password.result}@${module.rds.db_instance_endpoint}/${module.rds.db_instance_name}"

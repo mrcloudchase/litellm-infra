@@ -174,7 +174,6 @@ resource "aws_iam_role_policy_attachment" "ecs_task_cloudwatch_policy_attachment
 
 # S3 policy for ECS task role to access config bucket
 resource "aws_iam_policy" "ecs_task_s3_policy" {
-  count = var.s3_config_bucket_arn != "" ? 1 : 0
 
   name        = "${var.name_prefix}-ecs-task-s3-policy"
   description = "Policy for ECS tasks to access S3 config bucket"
@@ -205,8 +204,6 @@ resource "aws_iam_policy" "ecs_task_s3_policy" {
 
 # Attach S3 policy to task role
 resource "aws_iam_role_policy_attachment" "ecs_task_s3_policy_attachment" {
-  count = var.s3_config_bucket_arn != "" ? 1 : 0
-
   role       = aws_iam_role.ecs_task_role.name
-  policy_arn = aws_iam_policy.ecs_task_s3_policy[0].arn
+  policy_arn = aws_iam_policy.ecs_task_s3_policy.arn
 }

@@ -114,11 +114,6 @@ resource "aws_ecs_service" "main" {
     container_port   = var.container_port
   }
 
-  deployment_configuration {
-    minimum_healthy_percent = var.deployment_minimum_healthy_percent
-    maximum_percent         = var.deployment_maximum_percent
-  }
-
   health_check_grace_period_seconds = var.health_check_grace_period_seconds
   enable_execute_command           = var.enable_execute_command
 
