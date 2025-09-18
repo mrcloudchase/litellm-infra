@@ -1,0 +1,85 @@
+# Production Environment Configuration
+
+# General Settings
+aws_region   = "us-west-2"
+name_prefix  = "litellm-prod"
+
+# Default tags for all resources
+default_tags = {
+  Environment = "prod"
+  Project     = "litellm"
+  ManagedBy   = "terraform"
+  Owner       = "your-team"
+  CostCenter  = "engineering"
+}
+
+# VPC Configuration
+vpc_cidr                 = "10.1.0.0/16"
+public_subnet_cidrs      = ["10.1.1.0/24", "10.1.2.0/24"]
+private_subnet_cidrs     = ["10.1.10.0/24", "10.1.20.0/24"]
+database_subnet_cidrs    = ["10.1.100.0/24", "10.1.200.0/24"]
+enable_nat_gateway       = true
+single_nat_gateway       = false  # HA setup for production
+
+# Security Configuration
+allowed_cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]  # Restrict access
+
+# LiteLLM Configuration
+litellm_port       = 4000
+litellm_master_key = "sk-production-master-key"  # Use AWS Secrets Manager or strong key
+litellm_salt_key   = "production-salt-key"       # Use a secure random string
+container_image    = "ghcr.io/berriai/litellm:main-stable"
+
+# Database Configuration
+database_name               = "litellm"
+database_username           = "litellm"
+database_password           = "production-secure-password"  # Use AWS Secrets Manager
+db_engine_version          = "15.8"
+db_instance_class          = "db.r6g.large"
+db_allocated_storage       = 100
+db_max_allocated_storage   = 1000
+db_storage_encrypted       = true
+db_backup_retention_period = 30
+db_multi_az               = true   # HA setup
+db_deletion_protection    = true   # Protect from accidental deletion
+db_skip_final_snapshot    = false  # Create final snapshot
+
+# ECS Configuration
+ecs_cpu                   = 1024
+ecs_memory               = 2048
+ecs_desired_count        = 3
+ecs_min_capacity         = 2
+ecs_max_capacity         = 20
+ecs_enable_autoscaling   = true
+ecs_enable_execute_command = false  # Disable for security
+
+# ALB Configuration
+health_check_path                = "/health"
+health_check_interval           = 15
+health_check_timeout            = 5
+health_check_healthy_threshold  = 2
+health_check_unhealthy_threshold = 5
+alb_enable_deletion_protection  = true
+alb_idle_timeout               = 60
+
+# Additional Environment Variables for LiteLLM
+environment_variables = {
+  LITELLM_LOG_LEVEL = "INFO"
+  LITELLM_DROP_PARAMS = "true"
+  LITELLM_REQUEST_TIMEOUT = "600"
+}
+
+# Additional SSM Parameters (optional)
+additional_ssm_parameters = {
+  # Example: Add OpenAI API key
+  # "openai-api-key" = {
+  #   value       = "sk-your-openai-api-key"
+  #   type        = "SecureString"
+  #   description = "OpenAI API Key for LiteLLM"
+  # }
+  # "anthropic-api-key" = {
+  #   value       = "sk-ant-your-anthropic-api-key"
+  #   type        = "SecureString"
+  #   description = "Anthropic API Key for LiteLLM"
+  # }
+}

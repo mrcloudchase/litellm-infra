@@ -1,0 +1,78 @@
+# Staging Environment Configuration
+
+# General Settings
+aws_region   = "us-west-2"
+name_prefix  = "litellm-staging"
+
+# Default tags for all resources
+default_tags = {
+  Environment = "staging"
+  Project     = "litellm"
+  ManagedBy   = "terraform"
+  Owner       = "your-team"
+}
+
+# VPC Configuration
+vpc_cidr                 = "10.2.0.0/16"
+public_subnet_cidrs      = ["10.2.1.0/24", "10.2.2.0/24"]
+private_subnet_cidrs     = ["10.2.10.0/24", "10.2.20.0/24"]
+database_subnet_cidrs    = ["10.2.100.0/24", "10.2.200.0/24"]
+enable_nat_gateway       = true
+single_nat_gateway       = false
+
+# Security Configuration
+allowed_cidr_blocks = ["10.0.0.0/8", "0.0.0.0/0"]  # More open than prod
+
+# LiteLLM Configuration
+litellm_port       = 4000
+litellm_master_key = "sk-staging-master-key"  # Change this!
+litellm_salt_key   = "staging-salt-key"       # Use a secure random string
+container_image    = "ghcr.io/berriai/litellm:main-stable"
+
+# Database Configuration
+database_name               = "litellm"
+database_username           = "litellm"
+database_password           = "staging-secure-password"  # Change this!
+db_engine_version          = "15.8"
+db_instance_class          = "db.t3.small"
+db_allocated_storage       = 50
+db_max_allocated_storage   = 200
+db_storage_encrypted       = true
+db_backup_retention_period = 7
+db_multi_az               = false
+db_deletion_protection    = false
+db_skip_final_snapshot    = true
+
+# ECS Configuration
+ecs_cpu                   = 512
+ecs_memory               = 1024
+ecs_desired_count        = 2
+ecs_min_capacity         = 1
+ecs_max_capacity         = 5
+ecs_enable_autoscaling   = true
+ecs_enable_execute_command = true
+
+# ALB Configuration
+health_check_path                = "/health"
+health_check_interval           = 30
+health_check_timeout            = 5
+health_check_healthy_threshold  = 2
+health_check_unhealthy_threshold = 3
+alb_enable_deletion_protection  = false
+alb_idle_timeout               = 60
+
+# Additional Environment Variables for LiteLLM
+environment_variables = {
+  LITELLM_LOG_LEVEL = "INFO"
+  LITELLM_DROP_PARAMS = "true"
+}
+
+# Additional SSM Parameters (optional)
+additional_ssm_parameters = {
+  # Example: Add OpenAI API key
+  # "openai-api-key" = {
+  #   value       = "sk-your-openai-api-key"
+  #   type        = "SecureString"
+  #   description = "OpenAI API Key for LiteLLM"
+  # }
+}

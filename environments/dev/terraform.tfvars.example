@@ -1,0 +1,78 @@
+# Development Environment Configuration
+
+# General Settings
+aws_region   = "us-west-2"
+name_prefix  = "litellm-dev"
+
+# Default tags for all resources
+default_tags = {
+  Environment = "dev"
+  Project     = "litellm"
+  ManagedBy   = "terraform"
+  Owner       = "your-team"
+}
+
+# VPC Configuration
+vpc_cidr                 = "10.0.0.0/16"
+public_subnet_cidrs      = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs     = ["10.0.10.0/24", "10.0.20.0/24"]
+database_subnet_cidrs    = ["10.0.100.0/24", "10.0.200.0/24"]
+enable_nat_gateway       = true
+single_nat_gateway       = true  # Cost optimization for dev
+
+# Security Configuration
+allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
+
+# LiteLLM Configuration
+litellm_port       = 4000
+litellm_master_key = "sk-1234567890abcdef"  # Change this!
+litellm_salt_key   = "your-salt-key-here"   # Use a secure random string
+container_image    = "ghcr.io/berriai/litellm:main-stable"
+
+# Database Configuration
+database_name               = "litellm"
+database_username           = "litellm"
+database_password           = "your-secure-password"  # Change this!
+db_engine_version          = "15.8"
+db_instance_class          = "db.t3.micro"
+db_allocated_storage       = 20
+db_max_allocated_storage   = 100
+db_storage_encrypted       = true
+db_backup_retention_period = 7
+db_multi_az               = false  # Single AZ for dev
+db_deletion_protection    = false  # Allow deletion in dev
+db_skip_final_snapshot    = true   # Skip snapshot for dev
+
+# ECS Configuration
+ecs_cpu                   = 512
+ecs_memory               = 1024
+ecs_desired_count        = 1
+ecs_min_capacity         = 1
+ecs_max_capacity         = 3
+ecs_enable_autoscaling   = false  # Disable autoscaling for dev
+ecs_enable_execute_command = true # Enable for debugging
+
+# ALB Configuration
+health_check_path                = "/health"
+health_check_interval           = 30
+health_check_timeout            = 5
+health_check_healthy_threshold  = 2
+health_check_unhealthy_threshold = 3
+alb_enable_deletion_protection  = false
+alb_idle_timeout               = 60
+
+# Additional Environment Variables for LiteLLM
+environment_variables = {
+  LITELLM_LOG_LEVEL = "DEBUG"
+  LITELLM_DROP_PARAMS = "true"
+}
+
+# Additional SSM Parameters (optional)
+additional_ssm_parameters = {
+  # Example: Add OpenAI API key
+  # "openai-api-key" = {
+  #   value       = "sk-your-openai-api-key"
+  #   type        = "SecureString"
+  #   description = "OpenAI API Key for LiteLLM"
+  # }
+}
