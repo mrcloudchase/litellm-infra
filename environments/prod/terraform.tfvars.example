@@ -70,63 +70,38 @@ environment_variables = {
   LITELLM_REQUEST_TIMEOUT = "600"
 }
 
-# Additional SSM Parameters - API Keys and Configuration
+# API Keys for LiteLLM Models
+# REQUIRED: Add your OpenAI API key for the default gpt-4o-mini model
 additional_ssm_parameters = {
-  # Model Provider API Keys (Required for respective models)
+  # Required: OpenAI API key for gpt-4o-mini model (default in config)
   "openai-api-key" = {
-    value       = "sk-proj-your-openai-api-key-here"
+    value       = "sk-proj-your-production-openai-key-here"
     type        = "SecureString"
-    description = "OpenAI API Key for GPT models"
-  }
-  "anthropic-api-key" = {
-    value       = "sk-ant-your-anthropic-api-key-here"
-    type        = "SecureString"
-    description = "Anthropic API Key for Claude models"
-  }
-  "azure-api-key" = {
-    value       = "your-azure-openai-api-key"
-    type        = "SecureString"
-    description = "Azure OpenAI API Key"
-  }
-  "azure-api-base" = {
-    value       = "https://your-resource.openai.azure.com/"
-    type        = "String"
-    description = "Azure OpenAI API Base URL"
-  }
-  "google-api-key" = {
-    value       = "your-google-api-key"
-    type        = "SecureString"
-    description = "Google API Key for Gemini models"
+    description = "OpenAI API Key for LiteLLM Production"
   }
   
-  # Recommended for Production: Redis Configuration (for caching and routing)
-  "redis-host" = {
-    value       = "your-redis-cluster.cache.amazonaws.com"
-    type        = "String"
-    description = "Redis host for caching and routing"
-  }
-  "redis-password" = {
-    value       = "your-redis-password"
-    type        = "SecureString"
-    description = "Redis password"
-  }
-  
-  # Recommended for Production: Slack Integration (for alerts)
-  "slack-webhook-url" = {
-    value       = "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
-    type        = "SecureString"
-    description = "Slack webhook URL for alerts and notifications"
-  }
-  
-  # Recommended for Production: Langfuse Integration (for observability)
-  "langfuse-public-key" = {
-    value       = "pk-lf-your-public-key"
-    type        = "String"
-    description = "Langfuse public key for observability"
-  }
-  "langfuse-secret-key" = {
-    value       = "sk-lf-your-secret-key"
-    type        = "SecureString"
-    description = "Langfuse secret key for observability"
-  }
+  # Production: Consider enabling multiple providers for redundancy
+  # "anthropic-api-key" = {
+  #   value       = "sk-ant-your-production-anthropic-key-here"
+  #   type        = "SecureString"
+  #   description = "Anthropic API Key for Claude models"
+  # }
+  # 
+  # "azure-api-key" = {
+  #   value       = "your-production-azure-openai-key-here"
+  #   type        = "SecureString"
+  #   description = "Azure OpenAI API Key for Production"
+  # }
+  # 
+  # "azure-api-base" = {
+  #   value       = "https://your-production-resource.openai.azure.com/"
+  #   type        = "String"
+  #   description = "Azure OpenAI API Base URL for Production"
+  # }
+  # 
+  # "google-api-key" = {
+  #   value       = "your-production-google-api-key-here"
+  #   type        = "SecureString"
+  #   description = "Google API Key for Gemini models"
+  # }
 }

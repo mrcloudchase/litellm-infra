@@ -206,7 +206,7 @@ module "ecs" {
     S3_CONFIG_KEY    = module.s3_config.config_key
   })
   
-  secrets = concat([
+  secrets = [
     {
       name      = "LITELLM_MASTER_KEY"
       valueFrom = module.ssm.litellm_master_key_arn
@@ -219,13 +219,7 @@ module "ecs" {
       name      = "DATABASE_URL"
       valueFrom = module.ssm.database_url_arn
     }
-  ], [
-    # Convert additional SSM parameters to environment variables
-    for key, arn in module.ssm.additional_parameter_arns : {
-      name      = upper(replace(key, "-", "_"))
-      valueFrom = arn
-    }
-  ])
+  ]
   
   config_etag = module.s3_config.config_etag
   
