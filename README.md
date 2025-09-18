@@ -59,28 +59,38 @@ Your AWS credentials need permissions to create and manage:
 
 ## Quick Start
 
-### 1. Clone and Configure
+### 1. Clone and Setup
 
 ```bash
 git clone <your-repo-url>
 cd litellm-infra
+
+# Initialize Terraform
+terraform init
 ```
 
-### 2. Create Environment Configuration
-
-Copy the appropriate example configuration:
+### 2. Create Terraform Workspace
 
 ```bash
-# For development
-cp environments/dev/terraform.tfvars.example terraform.tfvars
+# Create and switch to your environment workspace
+terraform workspace new dev
 
-# Or for production
-cp environments/prod/terraform.tfvars.example terraform.tfvars
+# Or use existing environments
+# terraform workspace new staging
+# terraform workspace new prod
 ```
 
-### 3. Update Configuration
+### 3. Configure Environment
 
-Edit `terraform.tfvars` and update the required values:
+```bash
+# Copy the environment configuration template
+cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+
+# Edit with your specific values
+nano environments/dev/terraform.tfvars
+```
+
+Update the configuration with your values:
 
 ```hcl
 # Required values to configure
@@ -93,6 +103,20 @@ default_tags = {
   Owner       = "your-team"
 }
 
+# Add your API keys (these will be stored securely in SSM)
+additional_ssm_parameters = {
+  "openai-api-key" = {
+    value       = "sk-proj-your-openai-key-here"
+    type        = "SecureString"
+    description = "OpenAI API Key for LiteLLM"
+  }
+  "anthropic-api-key" = {
+    value       = "sk-ant-your-anthropic-key-here"
+    type        = "SecureString"
+    description = "Anthropic API Key for LiteLLM"
+  }
+}
+
 # Secrets are auto-generated - no manual input needed!
 # LiteLLM master key, salt key, and database password are 
 # automatically generated using Terraform's random provider
@@ -101,14 +125,12 @@ default_tags = {
 ### 4. Deploy Infrastructure
 
 ```bash
-# Initialize Terraform
-terraform init
+# Ensure you're in the correct workspace
+terraform workspace show
 
-# Review the plan
-terraform plan
-
-# Deploy the infrastructure
-terraform apply
+# Deploy using workspace-specific configuration
+terraform plan -var-file="environments/dev/terraform.tfvars"
+terraform apply -var-file="environments/dev/terraform.tfvars"
 ```
 
 ### 5. Access LiteLLM
@@ -145,16 +167,39 @@ curl -X POST "$(terraform output -raw alb_url)/v1/chat/completions" \
   }'
 ```
 
-## Environment Management
+## Environment Management with Workspaces
+
+### Workspace-Based Deployment (Recommended)
+
+This project uses Terraform workspaces to manage multiple environments with isolated state:
+
+```bash
+# List available workspaces
+terraform workspace list
+
+# Create new workspace for environment
+terraform workspace new dev
+terraform workspace new staging
+terraform workspace new prod
+
+# Switch between environments
+terraform workspace select dev
+terraform workspace show  # Verify current workspace
+```
 
 ### Development Environment
 
 ```bash
-# Use development configuration
-cp environments/dev/terraform.tfvars.example terraform.tfvars
+# Switch to dev workspace
+terraform workspace select dev
+
+# Configure development environment
+cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+nano environments/dev/terraform.tfvars
 
 # Deploy with cost optimizations
-terraform apply
+terraform plan -var-file="environments/dev/terraform.tfvars"
+terraform apply -var-file="environments/dev/terraform.tfvars"
 ```
 
 Development environment features:
@@ -167,11 +212,16 @@ Development environment features:
 ### Production Environment
 
 ```bash
-# Use production configuration
-cp environments/prod/terraform.tfvars.example terraform.tfvars
+# Switch to prod workspace
+terraform workspace select prod
+
+# Configure production environment
+cp environments/prod/terraform.tfvars.example environments/prod/terraform.tfvars
+nano environments/prod/terraform.tfvars
 
 # Deploy with high availability
-terraform apply
+terraform plan -var-file="environments/prod/terraform.tfvars"
+terraform apply -var-file="environments/prod/terraform.tfvars"
 ```
 
 Production environment features:
@@ -182,20 +232,22 @@ Production environment features:
 - Restricted network access
 - Auto-generated secrets unique to production environment
 
-### Multiple Environments
-
-To manage multiple environments simultaneously:
+### Multi-Environment Workflow
 
 ```bash
-# Create workspace for each environment
-terraform workspace new dev
-terraform workspace new staging
-terraform workspace new prod
-
-# Switch between environments
+# Deploy to development
 terraform workspace select dev
 terraform apply -var-file="environments/dev/terraform.tfvars"
 
+# Test and validate changes
+
+# Deploy to staging
+terraform workspace select staging
+terraform apply -var-file="environments/staging/terraform.tfvars"
+
+# Final validation
+
+# Deploy to production
 terraform workspace select prod
 terraform apply -var-file="environments/prod/terraform.tfvars"
 ```

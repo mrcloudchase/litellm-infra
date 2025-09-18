@@ -1,0 +1,28 @@
+# Terraform configuration files with sensitive data
+terraform.tfvars
+
+# Terraform state files (when using local state)
+*.tfstate
+*.tfstate.*
+
+# Terraform plan files
+*.tfplan
+
+# Terraform lock files (optional - some teams commit this)
+# .terraform.lock.hcl
+
+# Terraform directories
+.terraform/
+
+# Environment-specific sensitive files
+*.key
+*.pem
+*.crt
+
+# Backup files
+*.backup
+*.bak
+
+# OS files
+.DS_Store
+Thumbs.db

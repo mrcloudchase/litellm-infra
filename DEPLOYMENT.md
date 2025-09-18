@@ -13,31 +13,62 @@ This guide provides step-by-step instructions for deploying LiteLLM infrastructu
 
 ## Deployment Steps
 
-### Step 1: Environment Setup
+### Step 1: Repository Setup
 
 1. Clone the repository:
 ```bash
 git clone <your-repo>
 cd litellm-infra
+
+# Initialize Terraform
+terraform init
 ```
 
-2. Choose your environment and copy the configuration:
+### Step 2: Workspace Creation
+
+2. Create and configure your workspace:
 ```bash
-# For development
-cp environments/dev/terraform.tfvars.example terraform.tfvars
+# Create workspace for your environment
+terraform workspace new dev  # or staging/prod
 
-# For production
-cp environments/prod/terraform.tfvars.example terraform.tfvars
+# Verify workspace
+terraform workspace show
+terraform workspace list
 ```
 
-3. Edit `terraform.tfvars` with your values:
+### Step 3: Environment Configuration
+
+3. Configure your environment:
+```bash
+# Copy configuration template to environment directory
+cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+
+# Edit with your specific values
+nano environments/dev/terraform.tfvars
+```
+
+4. Update the configuration file:
 ```hcl
 name_prefix = "my-litellm"
 
 default_tags = {
-  Environment = "dev"  # or "prod"
+  Environment = "dev"
   Project     = "litellm"
   Owner       = "your-name"
+}
+
+# Add your API keys (stored securely in SSM)
+additional_ssm_parameters = {
+  "openai-api-key" = {
+    value       = "sk-proj-your-openai-key-here"
+    type        = "SecureString"
+    description = "OpenAI API Key for LiteLLM"
+  }
+  "anthropic-api-key" = {
+    value       = "sk-ant-your-anthropic-key-here"
+    type        = "SecureString"
+    description = "Anthropic API Key for LiteLLM"
+  }
 }
 
 # Secrets are auto-generated - no manual input needed!
@@ -45,31 +76,30 @@ default_tags = {
 # automatically generated using Terraform's random provider
 ```
 
-### Step 2: Infrastructure Deployment
+### Step 4: Infrastructure Deployment
 
-1. Initialize Terraform:
+1. Validate the configuration:
 ```bash
-terraform init
-```
+# Ensure you're in the correct workspace
+terraform workspace show
 
-2. Validate the configuration:
-```bash
+# Validate configuration
 terraform validate
 ```
 
-3. Review the deployment plan:
+2. Review the deployment plan:
 ```bash
-terraform plan
+terraform plan -var-file="environments/dev/terraform.tfvars"
 ```
 
-4. Deploy the infrastructure:
+3. Deploy the infrastructure:
 ```bash
-terraform apply
+terraform apply -var-file="environments/dev/terraform.tfvars"
 ```
 
 Type `yes` when prompted to confirm the deployment.
 
-### Step 3: Post-Deployment Verification
+### Step 5: Post-Deployment Verification
 
 1. Get the ALB URL:
 ```bash
@@ -123,8 +153,11 @@ aws ssm put-parameter \
 
 3. **Deploy configuration changes:**
 ```bash
+# Ensure you're in the correct workspace
+terraform workspace show
+
 # This uploads the new config and triggers ECS redeployment
-terraform apply
+terraform apply -var-file="environments/$(terraform workspace show)/terraform.tfvars"
 ```
 
 4. **Verify configuration deployment:**
@@ -158,14 +191,16 @@ aws ssm get-parameter --name "/my-litellm/litellm/master-key" --with-decryption
 Development environment is optimized for cost and ease of debugging:
 
 ```bash
-# Use development configuration
-cp environments/dev/terraform.tfvars.example terraform.tfvars
+# Switch to development workspace
+terraform workspace select dev
 
-# Edit the file with development-specific settings
-nano terraform.tfvars
+# Configure development environment
+cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+nano environments/dev/terraform.tfvars
 
-# Deploy
-terraform apply
+# Deploy to development
+terraform plan -var-file="environments/dev/terraform.tfvars"
+terraform apply -var-file="environments/dev/terraform.tfvars"
 ```
 
 Key development features:
@@ -180,14 +215,16 @@ Key development features:
 Production environment is optimized for high availability and security:
 
 ```bash
-# Use production configuration
-cp environments/prod/terraform.tfvars.example terraform.tfvars
+# Switch to production workspace
+terraform workspace select prod
 
-# Edit the file with production-specific settings
-nano terraform.tfvars
+# Configure production environment
+cp environments/prod/terraform.tfvars.example environments/prod/terraform.tfvars
+nano environments/prod/terraform.tfvars
 
-# Deploy
-terraform apply
+# Deploy to production
+terraform plan -var-file="environments/prod/terraform.tfvars"
+terraform apply -var-file="environments/prod/terraform.tfvars"
 ```
 
 Key production features:
@@ -312,7 +349,8 @@ aws ssm put-parameter \
 
 Then deploy the configuration:
 ```bash
-terraform apply
+# Deploy using current workspace configuration
+terraform apply -var-file="environments/$(terraform workspace show)/terraform.tfvars"
 ```
 
 ### Scaling Configuration
@@ -329,7 +367,7 @@ ecs_enable_autoscaling = true
 
 Then apply the changes:
 ```bash
-terraform apply
+terraform apply -var-file="environments/$(terraform workspace show)/terraform.tfvars"
 ```
 
 ## Monitoring and Maintenance
