@@ -1,7 +1,7 @@
 # Development Environment Configuration
 
 # General Settings
-aws_region   = "us-west-2"
+aws_region   = "us-east-1"
 name_prefix  = "litellm-dev"
 
 # Default tags for all resources
@@ -10,6 +10,7 @@ default_tags = {
   Project     = "litellm"
   ManagedBy   = "terraform"
   Owner       = "your-team"
+  CostCenter  = "engineering"
 }
 
 # VPC Configuration
@@ -26,9 +27,6 @@ allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
 # LiteLLM Configuration
 litellm_port    = 4000
 container_image = "ghcr.io/berriai/litellm:main-stable"
-
-# Secrets are auto-generated using Terraform random provider
-# No need to provide litellm_master_key, litellm_salt_key, or database_password
 
 # Database Configuration
 database_name     = "litellm"
