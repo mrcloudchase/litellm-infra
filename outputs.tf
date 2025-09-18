@@ -93,3 +93,19 @@ output "ecs_task_execution_role_arn" {
   description = "ARN of the ECS task execution role"
   value       = module.iam.ecs_task_execution_role_arn
 }
+
+# Generated Secrets Outputs
+output "litellm_master_key" {
+  description = "Auto-generated LiteLLM master key"
+  value       = local.litellm_master_key
+  sensitive   = true
+}
+
+output "secret_retrieval_commands" {
+  description = "Commands to retrieve secrets from SSM"
+  value = {
+    master_key = "aws ssm get-parameter --name '${module.ssm.litellm_master_key_name}' --with-decryption --query 'Parameter.Value' --output text"
+    salt_key   = "aws ssm get-parameter --name '${module.ssm.litellm_salt_key_name}' --with-decryption --query 'Parameter.Value' --output text"
+    db_url     = "aws ssm get-parameter --name '${module.ssm.database_url_name}' --with-decryption --query 'Parameter.Value' --output text"
+  }
+}

@@ -36,13 +36,13 @@ output "db_instance_username" {
 
 output "db_instance_password" {
   description = "RDS instance password"
-  value       = local.database_password
+  value       = var.database_password
   sensitive   = true
 }
 
 output "database_url" {
   description = "Database connection URL"
-  value       = "postgresql://${aws_db_instance.main.username}:${local.database_password}@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
+  value       = "postgresql://${aws_db_instance.main.username}:${var.database_password}@${aws_db_instance.main.endpoint}/${aws_db_instance.main.db_name}"
   sensitive   = true
 }
 

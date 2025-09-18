@@ -71,17 +71,7 @@ variable "litellm_port" {
   default     = 4000
 }
 
-variable "litellm_master_key" {
-  description = "LiteLLM master key for authentication"
-  type        = string
-  sensitive   = true
-}
-
-variable "litellm_salt_key" {
-  description = "LiteLLM salt key for encryption/decryption of API keys"
-  type        = string
-  sensitive   = true
-}
+# LiteLLM secrets are auto-generated using random provider
 
 variable "container_image" {
   description = "Docker image for LiteLLM"
@@ -102,11 +92,7 @@ variable "database_username" {
   default     = "litellm"
 }
 
-variable "database_password" {
-  description = "Password for the database"
-  type        = string
-  sensitive   = true
-}
+# Database password is auto-generated using random provider
 
 variable "db_engine_version" {
   description = "PostgreSQL engine version"

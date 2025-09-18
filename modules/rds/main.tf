@@ -1,14 +1,4 @@
-# Random password for database if not provided
-resource "random_password" "database_password" {
-  count = var.database_password == "" ? 1 : 0
-
-  length  = 32
-  special = true
-}
-
-locals {
-  database_password = var.database_password != "" ? var.database_password : random_password.database_password[0].result
-}
+# Database password is provided from the root module
 
 # DB Parameter Group
 resource "aws_db_parameter_group" "main" {
@@ -105,7 +95,7 @@ resource "aws_db_instance" "main" {
   # Database
   db_name  = var.database_name
   username = var.database_username
-  password = local.database_password
+  password = var.database_password
 
   # Network
   db_subnet_group_name   = var.db_subnet_group_name

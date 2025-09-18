@@ -24,15 +24,16 @@ single_nat_gateway       = true  # Cost optimization for dev
 allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
 
 # LiteLLM Configuration
-litellm_port       = 4000
-litellm_master_key = "sk-1234567890abcdef"  # Change this!
-litellm_salt_key   = "your-salt-key-here"   # Use a secure random string
-container_image    = "ghcr.io/berriai/litellm:main-stable"
+litellm_port    = 4000
+container_image = "ghcr.io/berriai/litellm:main-stable"
+
+# Secrets are auto-generated using Terraform random provider
+# No need to provide litellm_master_key, litellm_salt_key, or database_password
 
 # Database Configuration
-database_name               = "litellm"
-database_username           = "litellm"
-database_password           = "your-secure-password"  # Change this!
+database_name     = "litellm"
+database_username = "litellm"
+# Database password is auto-generated
 db_engine_version          = "15.8"
 db_instance_class          = "db.t3.micro"
 db_allocated_storage       = 20

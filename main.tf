@@ -28,12 +28,38 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+# Generate secrets using random provider
+resource "random_string" "litellm_master_key_suffix" {
+  length  = 48
+  special = false
+  upper   = true
+  lower   = true
+  numeric = true
+}
+
+resource "random_bytes" "litellm_salt_key" {
+  length = 32
+}
+
+resource "random_password" "database_password" {
+  length  = 32
+  special = true
+  upper   = true
+  lower   = true
+  numeric = true
+  override_special = "!#$%&*+-=?^_`{|}~"
+}
+
 # Local values
 locals {
   availability_zones = slice(data.aws_availability_zones.available.names, 0, 2)
   
-  # Generate database URL
-  database_url = "postgresql://${module.rds.db_instance_username}:${module.rds.db_instance_password}@${module.rds.db_instance_endpoint}/${module.rds.db_instance_name}"
+  # Format-compliant secrets
+  litellm_master_key = "sk-${random_string.litellm_master_key_suffix.result}"
+  litellm_salt_key   = base64encode(random_bytes.litellm_salt_key.result)
+  
+  # Generate database URL with auto-generated password
+  database_url = "postgresql://${module.rds.db_instance_username}:${random_password.database_password.result}@${module.rds.db_instance_endpoint}/${module.rds.db_instance_name}"
 }
 
 # VPC Module
@@ -84,7 +110,7 @@ module "rds" {
   
   database_name     = var.database_name
   database_username = var.database_username
-  database_password = var.database_password
+  database_password = random_password.database_password.result
   
   backup_retention_period = var.db_backup_retention_period
   multi_az               = var.db_multi_az
@@ -98,10 +124,10 @@ module "rds" {
 module "ssm" {
   source = "./modules/ssm"
 
-  name_prefix       = var.name_prefix
-  litellm_master_key = var.litellm_master_key
-  litellm_salt_key  = var.litellm_salt_key
-  database_url      = local.database_url
+  name_prefix        = var.name_prefix
+  litellm_master_key = local.litellm_master_key
+  litellm_salt_key   = local.litellm_salt_key
+  database_url       = local.database_url
   
   additional_parameters = var.additional_ssm_parameters
   
