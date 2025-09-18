@@ -109,3 +109,14 @@ output "secret_retrieval_commands" {
     db_url     = "aws ssm get-parameter --name '${module.ssm.database_url_name}' --with-decryption --query 'Parameter.Value' --output text"
   }
 }
+
+# S3 Config Outputs
+output "config_bucket_name" {
+  description = "Name of the S3 bucket containing LiteLLM configuration"
+  value       = module.s3_config.bucket_name
+}
+
+output "config_s3_uri" {
+  description = "S3 URI of the LiteLLM configuration file"
+  value       = "s3://${module.s3_config.bucket_name}/${module.s3_config.config_key}"
+}

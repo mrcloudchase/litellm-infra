@@ -44,12 +44,22 @@ resource "aws_ecs_task_definition" "main" {
         }
       ]
 
-      environment = [
+      command = [
+        "sh", "-c", 
+        "aws s3 cp s3://$S3_CONFIG_BUCKET/$S3_CONFIG_KEY /app/config.yaml && litellm --config /app/config.yaml --port ${var.container_port}"
+      ]
+
+      environment = concat([
         for key, value in var.environment_variables : {
           name  = key
           value = value
         }
-      ]
+      ], [
+        {
+          name  = "CONFIG_ETAG"
+          value = var.config_etag
+        }
+      ])
 
       secrets = var.secrets
 
