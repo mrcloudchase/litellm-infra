@@ -8,24 +8,8 @@ This guide provides step-by-step instructions for deploying LiteLLM infrastructu
 - [ ] AWS CLI installed and configured
 - [ ] Terraform >= 1.0 installed
 - [ ] Appropriate AWS IAM permissions
-- [ ] Generated secure keys for LiteLLM
 
-### 2. Generate Secure Keys
-
-Generate a secure master key:
-```bash
-openssl rand -base64 32
-```
-
-Generate a secure salt key:
-```bash
-openssl rand -base64 32
-```
-
-Generate a secure database password:
-```bash
-openssl rand -base64 24
-```
+**Note**: Secret generation is now fully automated - no manual key generation required!
 
 ## Deployment Steps
 
@@ -48,16 +32,17 @@ cp environments/prod/terraform.tfvars.example terraform.tfvars
 
 3. Edit `terraform.tfvars` with your values:
 ```hcl
-name_prefix        = "my-litellm"
-litellm_master_key = "your-generated-master-key"
-litellm_salt_key   = "your-generated-salt-key"
-database_password  = "your-generated-db-password"
+name_prefix = "my-litellm"
 
 default_tags = {
   Environment = "dev"  # or "prod"
   Project     = "litellm"
   Owner       = "your-name"
 }
+
+# Secrets are auto-generated - no manual input needed!
+# LiteLLM master key, salt key, and database password will be
+# automatically generated using Terraform's random provider
 ```
 
 ### Step 2: Infrastructure Deployment
@@ -106,10 +91,14 @@ aws ecs describe-services \
 curl -f "$ALB_URL/health"
 ```
 
-4. Test the LiteLLM API (requires model configuration):
+4. Test the LiteLLM API:
 ```bash
+# Get the auto-generated master key
+MASTER_KEY=$(terraform output -raw litellm_master_key)
+
+# Test the API
 curl -X POST "$ALB_URL/v1/models" \
-  -H "Authorization: Bearer $(terraform output -raw litellm_master_key)"
+  -H "Authorization: Bearer $MASTER_KEY"
 ```
 
 ### Step 4: Configure LiteLLM Models
@@ -125,6 +114,21 @@ aws ssm put-parameter \
 ```
 
 2. Update the ECS task definition to include the new environment variables or restart the service to pick up new SSM parameters.
+
+### Step 5: Access Generated Secrets
+
+Retrieve auto-generated secrets:
+
+```bash
+# Get the master key for API authentication
+terraform output -raw litellm_master_key
+
+# Get commands to retrieve all secrets from SSM
+terraform output secret_retrieval_commands
+
+# Or access directly from SSM
+aws ssm get-parameter --name "/my-litellm/litellm/master-key" --with-decryption
+```
 
 ## Environment-Specific Deployments
 
@@ -148,6 +152,7 @@ Key development features:
 - Smaller instance sizes
 - ECS Exec enabled for debugging
 - No deletion protection
+- Auto-generated secrets unique to development
 
 ### Production Environment
 
@@ -170,6 +175,7 @@ Key production features:
 - Multi-AZ RDS deployment
 - Deletion protection enabled
 - Restricted network access
+- Auto-generated secrets unique to production
 
 ## Multi-Environment Management
 
@@ -364,13 +370,14 @@ aws rds modify-db-instance \
 
 ## Security Best Practices
 
-1. **Use strong, unique passwords and keys**
+1. **Secrets are automatically generated with cryptographic strength**
 2. **Restrict network access using security groups**
 3. **Enable deletion protection in production**
-4. **Regularly rotate secrets**
+4. **Secrets are unique per environment and stored securely in SSM**
 5. **Monitor access logs and metrics**
 6. **Use least-privilege IAM policies**
 7. **Enable encryption at rest and in transit**
+8. **Rotate secrets by tainting Terraform random resources if needed**
 
 ## Performance Optimization
 
