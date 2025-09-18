@@ -43,7 +43,7 @@ The deployment creates the following AWS resources:
 1. **AWS CLI** configured with appropriate credentials
 2. **Terraform** >= 1.0 installed
 3. **AWS IAM permissions** for creating the required resources
-4. **LiteLLM configuration** (optional, for custom model configurations)
+4. **Terraform backend setup** (S3 bucket and DynamoDB table for state management)
 
 ### Required AWS Permissions
 
@@ -59,13 +59,67 @@ Your AWS credentials need permissions to create and manage:
 
 ## Quick Start
 
-### 1. Clone and Setup
+### 1. Clone and Setup Backend
 
 ```bash
 git clone <your-repo-url>
 cd litellm-infra
+```
 
-# Initialize Terraform
+**Important**: Before deploying the infrastructure, you need to set up Terraform remote state management to avoid the chicken-and-egg problem.
+
+#### Setup Terraform Backend (One-time)
+
+1. **Generate unique resource names:**
+```bash
+# Generate unique names for your backend resources
+BUCKET_NAME="litellm-terraform-state-$(openssl rand -hex 4)"
+DYNAMODB_TABLE="litellm-terraform-locks-$(openssl rand -hex 4)"
+echo "S3 Bucket: $BUCKET_NAME"
+echo "DynamoDB Table: $DYNAMODB_TABLE"
+```
+
+2. **Create backend resources manually:**
+```bash
+# Set variables
+export AWS_REGION="us-east-1"  # or your preferred region
+
+# Create S3 bucket
+aws s3api create-bucket --bucket $BUCKET_NAME --region $AWS_REGION
+
+# Enable versioning
+aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
+
+# Enable encryption
+aws s3api put-bucket-encryption --bucket $BUCKET_NAME --server-side-encryption-configuration '{
+  "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
+}'
+
+# Block public access
+aws s3api put-public-access-block --bucket $BUCKET_NAME --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# Create DynamoDB table
+aws dynamodb create-table \
+  --table-name $DYNAMODB_TABLE \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region $AWS_REGION
+```
+
+3. **Configure Terraform backend:**
+```bash
+# Copy backend template
+cp examples/backend.tf.example backend.tf
+
+# Edit with your actual bucket and table names
+vim backend.tf
+```
+
+4. **Initialize Terraform:**
+```bash
+# Initialize with remote state
 terraform init
 ```
 

@@ -8,6 +8,7 @@ This guide provides step-by-step instructions for deploying LiteLLM infrastructu
 - [ ] AWS CLI installed and configured
 - [ ] Terraform >= 1.0 installed
 - [ ] Appropriate AWS IAM permissions
+- [ ] Terraform backend setup (S3 + DynamoDB)
 
 **Note**: Secret generation is now fully automated - no manual key generation required!
 
@@ -19,14 +20,83 @@ This guide provides step-by-step instructions for deploying LiteLLM infrastructu
 ```bash
 git clone <your-repo>
 cd litellm-infra
+```
 
-# Initialize Terraform
+### Step 2: Backend Configuration (One-time Setup)
+
+**Important**: Set up Terraform remote state before deploying infrastructure to prevent chicken-and-egg issues.
+
+1. **Generate unique backend resource names:**
+```bash
+# Generate unique names to avoid conflicts
+BUCKET_NAME="litellm-terraform-state-$(openssl rand -hex 4)"
+DYNAMODB_TABLE="litellm-terraform-locks-$(openssl rand -hex 4)"
+echo "S3 Bucket: $BUCKET_NAME"
+echo "DynamoDB Table: $DYNAMODB_TABLE"
+```
+
+2. **Create backend resources manually:**
+```bash
+# Set your AWS region
+export AWS_REGION="us-east-1"  # or your preferred region
+
+# Create S3 bucket for state storage
+aws s3api create-bucket --bucket $BUCKET_NAME --region $AWS_REGION
+
+# Enable versioning for state history
+aws s3api put-bucket-versioning \
+  --bucket $BUCKET_NAME \
+  --versioning-configuration Status=Enabled
+
+# Enable server-side encryption
+aws s3api put-bucket-encryption \
+  --bucket $BUCKET_NAME \
+  --server-side-encryption-configuration '{
+    "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
+  }'
+
+# Block public access for security
+aws s3api put-public-access-block \
+  --bucket $BUCKET_NAME \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# Create DynamoDB table for state locking
+aws dynamodb create-table \
+  --table-name $DYNAMODB_TABLE \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region $AWS_REGION
+```
+
+3. **Verify backend resources:**
+```bash
+# Verify S3 bucket creation
+aws s3api head-bucket --bucket $BUCKET_NAME
+echo "✅ S3 bucket created: $BUCKET_NAME"
+
+# Verify DynamoDB table creation
+aws dynamodb describe-table --table-name $DYNAMODB_TABLE --query 'Table.TableStatus'
+echo "✅ DynamoDB table created: $DYNAMODB_TABLE"
+```
+
+4. **Configure Terraform backend:**
+```bash
+# Copy backend template
+cp examples/backend.tf.example backend.tf
+
+# Edit with your actual resource names
+nano backend.tf
+# Update bucket and dynamodb_table values with your generated names
+```
+
+5. **Initialize Terraform with remote state:**
+```bash
 terraform init
 ```
 
-### Step 2: Workspace Creation
-
-2. Create and configure your workspace:
+### Step 3: Workspace Creation
 ```bash
 # Create workspace for your environment
 terraform workspace new dev  # or staging/prod
@@ -36,9 +106,7 @@ terraform workspace show
 terraform workspace list
 ```
 
-### Step 3: Environment Configuration
-
-3. Configure your environment:
+### Step 4: Environment Configuration
 ```bash
 # Copy configuration template to environment directory
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
@@ -76,7 +144,7 @@ additional_ssm_parameters = {
 # automatically generated using Terraform's random provider
 ```
 
-### Step 4: Infrastructure Deployment
+### Step 5: Infrastructure Deployment
 
 1. Validate the configuration:
 ```bash
@@ -99,7 +167,7 @@ terraform apply -var-file="environments/dev/terraform.tfvars"
 
 Type `yes` when prompted to confirm the deployment.
 
-### Step 5: Post-Deployment Verification
+### Step 6: Post-Deployment Verification
 
 1. Get the ALB URL:
 ```bash
@@ -131,7 +199,7 @@ curl -X POST "$ALB_URL/v1/models" \
   -H "Authorization: Bearer $MASTER_KEY"
 ```
 
-### Step 4: Configure LiteLLM Models
+### Step 7: Configure LiteLLM Models
 
 The deployment automatically uploads the configuration file from `examples/litellm-config.yaml` to S3. To customize:
 
@@ -169,7 +237,7 @@ terraform output config_s3_uri
 aws ecs describe-services --cluster $(terraform output -raw ecs_cluster_name) --services $(terraform output -raw ecs_service_name)
 ```
 
-### Step 5: Access Generated Secrets
+### Step 8: Access Generated Secrets
 
 Retrieve auto-generated secrets:
 

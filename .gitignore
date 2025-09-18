@@ -12,6 +12,9 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Backend configuration (contains sensitive bucket/table names)
+backend.tf
+
 # OS files
 .DS_Store
 Thumbs.db
