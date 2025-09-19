@@ -401,16 +401,16 @@ graph TB
 graph TB
     subgraph "Development Process"
         subgraph "litellm-app Repository"
-            DevApp[👨‍💻 Developer<br/>App Changes]
+            DevApp[Developer<br/>App Changes]
             ConfigFile[litellm-config.yaml<br/>Model Definitions]
             Guardrails[Guardrail Files<br/>PII Detection Logic]
-            DockerBuild[🐳 Docker Build<br/>Multi-platform]
+            DockerBuild[Docker Build<br/>Multi-platform]
         end
         
         subgraph "litellm-infra Repository"
-            DevInfra[👨‍💻 Developer<br/>Infrastructure Changes]
+            DevInfra[Developer<br/>Infrastructure Changes]
             TerraformModules[Terraform Modules<br/>AWS Resources]
-            EnvConfigs[Environment Configs<br/>API Keys, Resources]
+            EnvConfigs[Environment Configs<br/>API Keys Resources]
         end
     end
 
@@ -433,8 +433,8 @@ graph TB
         ECS[AWS ECS<br/>Multi-Container Tasks]
         
         subgraph "Running Infrastructure"
-            LiveContainers[🐳 Live Containers<br/>LiteLLM + Ollama]
-            LiveModels[🤖 Active Models<br/>Local + Cloud]
+            LiveContainers[Live Containers<br/>LiteLLM and Ollama]
+            LiveModels[Active Models<br/>Local and Cloud]
         end
     end
 
