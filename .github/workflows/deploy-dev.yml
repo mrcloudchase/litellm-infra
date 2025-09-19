@@ -133,9 +133,9 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
 
-      - name: Select Dev Workspace
+      - name: Select CI Workspace
         run: |
-          terraform workspace select dev || terraform workspace new dev
+          terraform workspace select dev-ci || terraform workspace new dev-ci
 
       - name: Validate Configuration
         run: terraform validate
