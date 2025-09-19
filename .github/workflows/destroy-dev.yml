@@ -1,0 +1,107 @@
+name: Destroy Dev Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Type "DESTROY" to confirm destruction of the dev-ci environment'
+        required: true
+        default: ''
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_aws_region: us-east-1
+
+jobs:
+  destroy-dev:
+    name: Destroy Dev CI Environment
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Validate Destroy Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
+            echo "❌ Destruction cancelled. You must type 'DESTROY' to confirm."
+            exit 1
+          fi
+          echo "✅ Destruction confirmed. Proceeding to destroy dev-ci environment..."
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Create Backend Configuration
+        run: |
+          cat > backend.tf << 'EOF'
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+              key            = "litellm-infra/terraform.tfstate"
+              region         = "${{ env.AWS_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TERRAFORM_LOCKS_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Select CI Workspace
+        run: |
+          terraform workspace select dev-ci || {
+            echo "❌ dev-ci workspace not found. Nothing to destroy."
+            exit 0
+          }
+
+      - name: Show Current Resources
+        run: |
+          echo "📋 Current resources in dev-ci workspace:"
+          terraform state list || echo "No resources found in state."
+
+      - name: Plan Destruction
+        run: |
+          terraform plan -destroy -out=destroyplan
+          echo "📋 Resources to be destroyed:"
+          terraform show destroyplan
+
+      - name: Destroy Infrastructure
+        run: |
+          echo "🔥 Destroying dev-ci environment..."
+          terraform apply -auto-approve destroyplan
+          echo "✅ Infrastructure destroyed successfully!"
+
+      - name: Clean Up Workspace
+        run: |
+          echo "🧹 Cleaning up workspace..."
+          # Check if workspace is empty
+          if [ "$(terraform state list | wc -l)" -eq 0 ]; then
+            echo "Workspace is empty, deleting it..."
+            terraform workspace select default
+            terraform workspace delete dev-ci
+            echo "✅ dev-ci workspace deleted"
+          else
+            echo "⚠️  Workspace still contains resources, keeping it"
+          fi
+
+      - name: Summary
+        run: |
+          echo "🎯 Destruction Summary:"
+          echo "Environment: dev-ci"
+          echo "Workspace: Cleaned up"
+          echo "AWS Resources: Destroyed"
+          echo "💰 Cost Impact: Resources stopped billing"
+          echo ""
+          echo "ℹ️  To redeploy, run the 'Deploy Dev Environment' workflow"
