@@ -10,6 +10,8 @@ on:
       - 'outputs.tf'
       - 'environments/dev/**'
   workflow_dispatch:  # Allow manual triggering
+  repository_dispatch:  # Triggered by litellm-app when new image is built
+    types: [deploy_new_image]
 
 env:
   AWS_REGION: us-east-1
@@ -50,6 +52,19 @@ jobs:
           }
           EOF
 
+      - name: Determine Container Image
+        run: |
+          # Use image from repository dispatch if available, otherwise use secret
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            CONTAINER_IMAGE="${{ github.event.client_payload.image_uri }}"
+            echo "Using new image from litellm-app: $CONTAINER_IMAGE"
+            echo "Source commit: ${{ github.event.client_payload.source_commit }}"
+          else
+            CONTAINER_IMAGE="${{ secrets.CUSTOM_CONTAINER_IMAGE }}"
+            echo "Using configured image: $CONTAINER_IMAGE"
+          fi
+          echo "CONTAINER_IMAGE=$CONTAINER_IMAGE" >> $GITHUB_ENV
+
       - name: Create Dev Configuration
         run: |
           cat > environments/dev/terraform.tfvars << EOF
@@ -81,7 +96,7 @@ jobs:
           
           # LiteLLM Configuration
           litellm_port    = 4000
-          container_image = "${{ secrets.CUSTOM_CONTAINER_IMAGE }}"
+          container_image = "${{ env.CONTAINER_IMAGE }}"
           
           # Database Configuration (cost-optimized)
           database_name     = "litellm"
@@ -152,6 +167,14 @@ jobs:
       - name: Get Deployment Information
         run: |
           echo "## Dev Environment Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployment Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Container Image**: ${{ env.CONTAINER_IMAGE }}" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "- **Source Commit**: ${{ github.event.client_payload.source_commit }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source Repository**: ${{ github.event.client_payload.source_repo }}" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Access Information:" >> $GITHUB_STEP_SUMMARY
           echo "- **ALB URL**: $(terraform output -raw alb_url)" >> $GITHUB_STEP_SUMMARY
