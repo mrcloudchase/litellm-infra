@@ -43,8 +43,8 @@ db_deletion_protection    = false
 db_skip_final_snapshot    = true
 
 # ECS Configuration
-ecs_cpu                   = 512
-ecs_memory               = 1024
+ecs_cpu                   = 2048  # Increased for Ollama model serving
+ecs_memory               = 6144   # Increased for llama3.2:3b model (~3GB + overhead)
 ecs_desired_count        = 2
 ecs_min_capacity         = 1
 ecs_max_capacity         = 5

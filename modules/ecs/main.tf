@@ -34,6 +34,51 @@ resource "aws_ecs_task_definition" "main" {
 
   container_definitions = jsonencode([
     {
+      name  = "ollama"
+      image = "ollama/ollama:latest"
+      
+      portMappings = [
+        {
+          containerPort = 11434
+          protocol      = "tcp"
+        }
+      ]
+
+      environment = [
+        {
+          name  = "OLLAMA_HOST"
+          value = "0.0.0.0:11434"
+        }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+          "awslogs-region"        = data.aws_region.current.name
+          "awslogs-stream-prefix" = "ollama"
+        }
+      }
+
+      healthCheck = {
+        command = [
+          "CMD-SHELL",
+          "curl -f http://localhost:11434/api/tags || exit 1"
+        ]
+        interval    = 30
+        timeout     = 10
+        retries     = 5
+        startPeriod = 120
+      }
+
+      entryPoint = ["sh", "-c"]
+      command = [
+        "ollama serve & sleep 30 && ollama pull llama3.2:3b && echo 'Model pulled successfully' && wait"
+      ]
+
+      essential = true
+    },
+    {
       name  = "litellm"
       image = var.container_image
       
@@ -44,12 +89,17 @@ resource "aws_ecs_task_definition" "main" {
         }
       ]
 
-      environment = [
+      environment = concat([
         for key, value in var.environment_variables : {
           name  = key
           value = value
         }
-      ]
+      ], [
+        {
+          name  = "OLLAMA_BASE_URL"
+          value = "http://localhost:11434"
+        }
+      ])
 
       secrets = var.secrets
 
@@ -58,7 +108,7 @@ resource "aws_ecs_task_definition" "main" {
         options = {
           "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
           "awslogs-region"        = data.aws_region.current.name
-          "awslogs-stream-prefix" = "ecs"
+          "awslogs-stream-prefix" = "litellm"
         }
       }
 
@@ -70,8 +120,15 @@ resource "aws_ecs_task_definition" "main" {
         interval    = 30
         timeout     = 5
         retries     = 3
-        startPeriod = 60
+        startPeriod = 180
       }
+
+      dependsOn = [
+        {
+          containerName = "ollama"
+          condition     = "HEALTHY"
+        }
+      ]
 
       essential = true
     }
