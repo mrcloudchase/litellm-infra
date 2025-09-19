@@ -44,11 +44,6 @@ resource "aws_ecs_task_definition" "main" {
         }
       ]
 
-      # Note: Custom container from litellm-app repo includes:
-      # - LiteLLM configuration baked in
-      # - PII guardrails pre-installed and configured
-      # - No runtime configuration needed
-
       environment = [
         for key, value in var.environment_variables : {
           name  = key

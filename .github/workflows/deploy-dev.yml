@@ -1,0 +1,184 @@
+name: Deploy Dev Environment
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/**'
+      - 'main.tf'
+      - 'variables.tf'
+      - 'outputs.tf'
+      - 'environments/dev/**'
+  workflow_dispatch:  # Allow manual triggering
+
+env:
+  AWS_REGION: us-east-1
+  TF_VAR_aws_region: us-east-1
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.0
+
+      - name: Create Backend Configuration
+        run: |
+          cat > backend.tf << EOF
+          terraform {
+            backend "s3" {
+              bucket         = "${{ secrets.TF_STATE_BUCKET }}"
+              key            = "litellm-infra/terraform.tfstate"
+              region         = "${{ env.AWS_REGION }}"
+              encrypt        = true
+              dynamodb_table = "${{ secrets.TF_LOCK_TABLE }}"
+            }
+          }
+          EOF
+
+      - name: Create Dev Configuration
+        run: |
+          cat > environments/dev/terraform.tfvars << EOF
+          # Auto-generated configuration for CI/CD deployment
+          
+          # General Settings
+          aws_region   = "${{ env.AWS_REGION }}"
+          name_prefix  = "litellm-dev-ci"
+          
+          # Default tags for all resources
+          default_tags = {
+            Environment = "dev"
+            Project     = "litellm"
+            ManagedBy   = "terraform-ci"
+            Owner       = "github-actions"
+            CostCenter  = "engineering"
+          }
+          
+          # VPC Configuration (cost-optimized for dev)
+          vpc_cidr                 = "10.0.0.0/16"
+          public_subnet_cidrs      = ["10.0.1.0/24", "10.0.2.0/24"]
+          private_subnet_cidrs     = ["10.0.10.0/24", "10.0.20.0/24"]
+          database_subnet_cidrs    = ["10.0.100.0/24", "10.0.200.0/24"]
+          enable_nat_gateway       = true
+          single_nat_gateway       = true
+          
+          # Security Configuration
+          allowed_cidr_blocks = ["0.0.0.0/0"]
+          
+          # LiteLLM Configuration
+          litellm_port    = 4000
+          container_image = "${{ secrets.CUSTOM_CONTAINER_IMAGE }}"
+          
+          # Database Configuration (cost-optimized)
+          database_name     = "litellm"
+          database_username = "litellm"
+          db_engine_version          = "15.8"
+          db_instance_class          = "db.t3.micro"
+          db_allocated_storage       = 20
+          db_max_allocated_storage   = 100
+          db_storage_encrypted       = true
+          db_backup_retention_period = 7
+          db_multi_az               = false
+          db_deletion_protection    = false
+          db_skip_final_snapshot    = true
+          
+          # ECS Configuration (cost-optimized)
+          ecs_cpu                   = 512
+          ecs_memory               = 1024
+          ecs_desired_count        = 1
+          ecs_min_capacity         = 1
+          ecs_max_capacity         = 3
+          ecs_enable_autoscaling   = false
+          ecs_enable_execute_command = true
+          
+          # ALB Configuration
+          health_check_path                = "/health"
+          health_check_interval           = 30
+          health_check_timeout            = 5
+          health_check_healthy_threshold  = 2
+          health_check_unhealthy_threshold = 3
+          alb_enable_deletion_protection  = false
+          alb_idle_timeout               = 60
+          
+          # Environment Variables
+          environment_variables = {
+            LITELLM_LOG_LEVEL = "DEBUG"
+            LITELLM_DROP_PARAMS = "true"
+          }
+          
+          # API Keys for LiteLLM Models
+          additional_ssm_parameters = {
+            "openai-api-key" = {
+              value       = "${{ secrets.OPENAI_API_KEY }}"
+              type        = "SecureString"
+              description = "OpenAI API Key for LiteLLM Dev"
+            }
+          }
+          EOF
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Select Dev Workspace
+        run: |
+          terraform workspace select dev || terraform workspace new dev
+
+      - name: Validate Configuration
+        run: terraform validate
+
+      - name: Plan Infrastructure Changes
+        run: |
+          terraform plan \
+            -var-file="environments/dev/terraform.tfvars" \
+            -out=tfplan
+        
+      - name: Apply Infrastructure Changes
+        run: terraform apply tfplan
+
+      - name: Get Deployment Information
+        run: |
+          echo "## 🚀 Dev Environment Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Access Information:" >> $GITHUB_STEP_SUMMARY
+          echo "- **ALB URL**: $(terraform output -raw alb_url)" >> $GITHUB_STEP_SUMMARY
+          echo "- **ECS Cluster**: $(terraform output -raw ecs_cluster_name)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database Endpoint**: $(terraform output -raw database_endpoint)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔑 Secret Retrieval Commands:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "# Get LiteLLM master key:" >> $GITHUB_STEP_SUMMARY
+          echo "$(terraform output secret_retrieval_commands | jq -r '.master_key')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Get database URL:" >> $GITHUB_STEP_SUMMARY
+          echo "$(terraform output secret_retrieval_commands | jq -r '.db_url')" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Test Health Endpoint
+        run: |
+          ALB_URL=$(terraform output -raw alb_url)
+          echo "🏥 Testing health endpoint..."
+          
+          # Wait for service to be healthy (up to 5 minutes)
+          for i in {1..30}; do
+            if curl -f "$ALB_URL/health" --connect-timeout 10 --max-time 30; then
+              echo "✅ Health check passed!"
+              break
+            else
+              echo "⏳ Waiting for service to be healthy... (attempt $i/30)"
+              sleep 10
+            fi
+          done
