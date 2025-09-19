@@ -45,25 +45,16 @@ resource "aws_ecs_task_definition" "main" {
       ]
 
       # Note: Custom container from litellm-app repo includes:
-      # - AWS CLI for config download
-      # - PII guardrails pre-installed
-      # - Startup script that downloads config from S3
-      command = [
-        "sh", "-c",
-        "aws s3 cp s3://$S3_CONFIG_BUCKET/$S3_CONFIG_KEY /app/config.yaml && litellm --config /app/config.yaml --port ${var.container_port}"
-      ]
+      # - LiteLLM configuration baked in
+      # - PII guardrails pre-installed and configured
+      # - No runtime configuration needed
 
-      environment = concat([
+      environment = [
         for key, value in var.environment_variables : {
           name  = key
           value = value
         }
-      ], [
-        {
-          name  = "CONFIG_ETAG"
-          value = var.config_etag
-        }
-      ])
+      ]
 
       secrets = var.secrets
 

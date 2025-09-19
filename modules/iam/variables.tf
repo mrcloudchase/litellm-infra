@@ -9,11 +9,8 @@ variable "ssm_parameter_arns" {
   default     = []
 }
 
-variable "s3_config_bucket_arn" {
-  description = "ARN of the S3 bucket containing LiteLLM configuration"
-  type        = string
-  default     = ""
-}
+# Note: s3_config_bucket_arn variable removed - configuration is now baked into container
+# No S3 access needed for configuration files
 
 variable "additional_task_policy_arns" {
   description = "List of additional policy ARNs to attach to the task role"

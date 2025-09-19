@@ -110,13 +110,5 @@ output "secret_retrieval_commands" {
   }
 }
 
-# S3 Config Outputs
-output "config_bucket_name" {
-  description = "Name of the S3 bucket containing LiteLLM configuration"
-  value       = module.s3_config.bucket_name
-}
-
-output "config_s3_uri" {
-  description = "S3 URI of the LiteLLM configuration file"
-  value       = "s3://${module.s3_config.bucket_name}/${module.s3_config.config_key}"
-}
+# Note: S3 config outputs removed - configuration is now baked into container
+# Built and managed in the separate litellm-app repository

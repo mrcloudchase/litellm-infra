@@ -10,7 +10,7 @@ The deployment creates the following AWS resources:
 - **ECS**: Fargate cluster running the LiteLLM container with auto-scaling
 - **RDS**: PostgreSQL database for LiteLLM data persistence
 - **ALB**: Application Load Balancer for traffic distribution
-- **S3**: Configuration storage bucket for LiteLLM config file
+- **Configuration**: Managed via custom container from separate litellm-app repository
 - **SSM**: Parameter Store for secure secrets management
 - **IAM**: Roles and policies for secure access
 - **Security Groups**: Network security rules for each component
@@ -26,8 +26,7 @@ The deployment creates the following AWS resources:
 │   ├── ssm/                   # SSM Parameter Store
 │   ├── rds/                   # PostgreSQL database
 │   ├── alb/                   # Application Load Balancer
-│   ├── ecs/                   # ECS cluster and service
-│   └── s3-config/             # S3 bucket for configuration storage
+│   └── ecs/                   # ECS cluster and service
 ├── environments/              # Environment-specific configurations
 │   ├── dev/
 │   │   ├── terraform.tfvars.example

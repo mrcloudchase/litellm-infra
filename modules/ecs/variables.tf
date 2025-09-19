@@ -150,11 +150,8 @@ variable "deployment_maximum_percent" {
   default     = 200
 }
 
-variable "config_etag" {
-  description = "ETag of the configuration file to trigger redeployments"
-  type        = string
-  default     = ""
-}
+# Note: config_etag variable removed - configuration is now baked into container
+# Container versioning handles configuration changes
 
 variable "tags" {
   description = "A map of tags to add to all resources"

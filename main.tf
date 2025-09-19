@@ -134,15 +134,8 @@ module "ssm" {
   tags = var.default_tags
 }
 
-# S3 Config Module
-module "s3_config" {
-  source = "./modules/s3-config"
-
-  name_prefix    = var.name_prefix
-  config_content = file("${path.root}/examples/litellm-config.yaml")
-  
-  tags = var.default_tags
-}
+# Note: S3 config module removed - configuration is now baked into custom container
+# Built and managed in the separate litellm-app repository
 
 # IAM Module
 module "iam" {
@@ -150,7 +143,6 @@ module "iam" {
 
   name_prefix           = var.name_prefix
   ssm_parameter_arns    = module.ssm.all_parameter_arns
-  s3_config_bucket_arn  = module.s3_config.bucket_arn
   additional_task_policy_arns = var.additional_task_policy_arns
   
   tags = var.default_tags
@@ -201,10 +193,7 @@ module "ecs" {
   max_capacity  = var.ecs_max_capacity
   enable_autoscaling = var.ecs_enable_autoscaling
   
-  environment_variables = merge(var.environment_variables, {
-    S3_CONFIG_BUCKET = module.s3_config.bucket_name
-    S3_CONFIG_KEY    = module.s3_config.config_key
-  })
+  environment_variables = var.environment_variables
   
   secrets = concat([
     {
@@ -225,8 +214,6 @@ module "ecs" {
       valueFrom = arn
     }
   ])
-  
-  config_etag = module.s3_config.config_etag
   
   enable_execute_command = var.ecs_enable_execute_command
   
