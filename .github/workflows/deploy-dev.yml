@@ -92,7 +92,7 @@ jobs:
           single_nat_gateway       = true
           
           # Security Configuration
-          allowed_cidr_blocks = ["0.0.0.0/0"]
+          allowed_cidr_blocks = ["68.76.147.104/32"]  # Restrict to your IP only
           
           # LiteLLM Configuration
           litellm_port    = 4000
