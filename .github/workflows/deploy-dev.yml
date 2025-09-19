@@ -151,14 +151,14 @@ jobs:
 
       - name: Get Deployment Information
         run: |
-          echo "## 🚀 Dev Environment Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## Dev Environment Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🌐 Access Information:" >> $GITHUB_STEP_SUMMARY
+          echo "### Access Information:" >> $GITHUB_STEP_SUMMARY
           echo "- **ALB URL**: $(terraform output -raw alb_url)" >> $GITHUB_STEP_SUMMARY
           echo "- **ECS Cluster**: $(terraform output -raw ecs_cluster_name)" >> $GITHUB_STEP_SUMMARY
           echo "- **Database Endpoint**: $(terraform output -raw database_endpoint)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🔑 Secret Retrieval Commands:" >> $GITHUB_STEP_SUMMARY
+          echo "### Secret Retrieval Commands:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# Get LiteLLM master key:" >> $GITHUB_STEP_SUMMARY
           echo "$(terraform output secret_retrieval_commands | jq -r '.master_key')" >> $GITHUB_STEP_SUMMARY
@@ -170,15 +170,15 @@ jobs:
       - name: Test Health Endpoint
         run: |
           ALB_URL=$(terraform output -raw alb_url)
-          echo "🏥 Testing health endpoint..."
+          echo "Testing health endpoint..."
           
           # Wait for service to be healthy (up to 5 minutes)
           for i in {1..30}; do
             if curl -f "$ALB_URL/health" --connect-timeout 10 --max-time 30; then
-              echo "✅ Health check passed!"
+              echo "Health check passed!"
               break
             else
-              echo "⏳ Waiting for service to be healthy... (attempt $i/30)"
+              echo "Waiting for service to be healthy... (attempt $i/30)"
               sleep 10
             fi
           done

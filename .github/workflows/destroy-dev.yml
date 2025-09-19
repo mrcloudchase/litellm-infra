@@ -22,10 +22,10 @@ jobs:
       - name: Validate Destroy Confirmation
         run: |
           if [ "${{ github.event.inputs.confirm_destroy }}" != "DESTROY" ]; then
-            echo "❌ Destruction cancelled. You must type 'DESTROY' to confirm."
+            echo "Destruction cancelled. You must type 'DESTROY' to confirm."
             exit 1
           fi
-          echo "✅ Destruction confirmed. Proceeding to destroy dev-ci environment..."
+          echo "Destruction confirmed. Proceeding to destroy dev-ci environment..."
 
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -62,46 +62,46 @@ jobs:
       - name: Select CI Workspace
         run: |
           terraform workspace select dev-ci || {
-            echo "❌ dev-ci workspace not found. Nothing to destroy."
+            echo "dev-ci workspace not found. Nothing to destroy."
             exit 0
           }
 
       - name: Show Current Resources
         run: |
-          echo "📋 Current resources in dev-ci workspace:"
+          echo "Current resources in dev-ci workspace:"
           terraform state list || echo "No resources found in state."
 
       - name: Plan Destruction
         run: |
           terraform plan -destroy -out=destroyplan
-          echo "📋 Resources to be destroyed:"
+          echo "Resources to be destroyed:"
           terraform show destroyplan
 
       - name: Destroy Infrastructure
         run: |
-          echo "🔥 Destroying dev-ci environment..."
+          echo "Destroying dev-ci environment..."
           terraform apply -auto-approve destroyplan
-          echo "✅ Infrastructure destroyed successfully!"
+          echo "Infrastructure destroyed successfully!"
 
       - name: Clean Up Workspace
         run: |
-          echo "🧹 Cleaning up workspace..."
+          echo "Cleaning up workspace..."
           # Check if workspace is empty
           if [ "$(terraform state list | wc -l)" -eq 0 ]; then
             echo "Workspace is empty, deleting it..."
             terraform workspace select default
             terraform workspace delete dev-ci
-            echo "✅ dev-ci workspace deleted"
+            echo "dev-ci workspace deleted"
           else
-            echo "⚠️  Workspace still contains resources, keeping it"
+            echo "WARNING: Workspace still contains resources, keeping it"
           fi
 
       - name: Summary
         run: |
-          echo "🎯 Destruction Summary:"
+          echo "Destruction Summary:"
           echo "Environment: dev-ci"
           echo "Workspace: Cleaned up"
           echo "AWS Resources: Destroyed"
-          echo "💰 Cost Impact: Resources stopped billing"
+          echo "Cost Impact: Resources stopped billing"
           echo ""
-          echo "ℹ️  To redeploy, run the 'Deploy Dev Environment' workflow"
+          echo "INFO: To redeploy, run the 'Deploy Dev Environment' workflow"
