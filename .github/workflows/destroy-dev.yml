@@ -40,7 +40,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.5.0"
+          terraform_version: ~1.0
 
       - name: Create Backend Configuration
         run: |
@@ -66,18 +66,33 @@ jobs:
             exit 0
           }
 
+      - name: Determine Container Image
+        run: |
+          # Use image from repository dispatch if available, otherwise use secret
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            CONTAINER_IMAGE="${{ github.event.client_payload.image_uri }}"
+            echo "Using new image from litellm-app: $CONTAINER_IMAGE"
+            echo "Source commit: ${{ github.event.client_payload.source_commit }}"
+          else
+            CONTAINER_IMAGE="${{ secrets.CUSTOM_CONTAINER_IMAGE }}"
+            echo "Using configured image: $CONTAINER_IMAGE"
+          fi
+          echo "CONTAINER_IMAGE=$CONTAINER_IMAGE" >> $GITHUB_ENV
+
       - name: Create Terraform Variables
         run: |
           echo "Creating terraform.tfvars for destroy operations..."
           cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
           
-          # Replace container image placeholder (not critical for destroy, but needed for validation)
-          sed -i 's|container_image = ".*"|container_image = "ghcr.io/berriai/litellm:main-stable"|' environments/dev/terraform.tfvars
+          # Replace container image placeholder with determined image (same as deploy)
+          sed -i 's|container_image = ".*"|container_image = "${{ env.CONTAINER_IMAGE }}"|' environments/dev/terraform.tfvars
           
-          # Replace OpenAI API key placeholder (not critical for destroy, but needed for validation)
-          sed -i 's|PLACEHOLDER_REPLACED_BY_GITHUB_ACTIONS|dummy-key-for-destroy|' environments/dev/terraform.tfvars
+          # Replace OpenAI API key placeholder with actual secret (same as deploy)
+          sed -i 's|PLACEHOLDER_REPLACED_BY_GITHUB_ACTIONS|${{ secrets.OPENAI_API_KEY }}|' environments/dev/terraform.tfvars
           
-          echo "Terraform variables prepared for destroy operations"
+          echo "Using configuration identical to deploy workflow:"
+          echo "- Container Image: ${{ env.CONTAINER_IMAGE }}"
+          echo "- OpenAI API Key: [REDACTED]"
 
       - name: Show Current Resources
         run: |
