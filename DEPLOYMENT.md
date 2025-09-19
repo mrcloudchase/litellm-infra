@@ -201,12 +201,12 @@ curl -X POST "$ALB_URL/v1/models" \
 
 ### Step 7: Configure LiteLLM Models
 
-The deployment automatically uploads the configuration file from `examples/litellm-config.yaml` to S3. To customize:
+Configuration is now managed in the separate litellm-app repository. To customize:
 
-1. **Edit the configuration file:**
+1. **Use custom container with your configuration:**
 ```bash
-# Edit the LiteLLM configuration
-vim examples/litellm-config.yaml
+# Update terraform.tfvars to use your custom container
+container_image = "your-account.dkr.ecr.us-east-1.amazonaws.com/litellm-custom:v1.0.0"
 ```
 
 2. **Add your API keys to SSM Parameter Store:**
@@ -224,14 +224,13 @@ aws ssm put-parameter \
 # Ensure you're in the correct workspace
 terraform workspace show
 
-# This uploads the new config and triggers ECS redeployment
+# Deploy with updated container image
 terraform apply -var-file="environments/$(terraform workspace show)/terraform.tfvars"
 ```
 
 4. **Verify configuration deployment:**
 ```bash
-# Check the S3 configuration location
-terraform output config_s3_uri
+# Note: Configuration is now baked into container from litellm-app repository
 
 # Verify ECS tasks are using new configuration
 aws ecs describe-services --cluster $(terraform output -raw ecs_cluster_name) --services $(terraform output -raw ecs_service_name)
@@ -354,28 +353,28 @@ terraform init && terraform apply
 
 ### Updating LiteLLM Configuration
 
-The primary method for configuring LiteLLM is through the configuration file:
+Configuration is now managed in the separate litellm-app repository:
 
-1. **Edit Configuration File:**
+1. **Build New Container:**
 ```bash
-# Edit the main configuration
-vim examples/litellm-config.yaml
-
-# Add new models, change settings, update configurations
+# In litellm-app repository:
+# 1. Edit configuration files
+# 2. Update guardrails if needed
+# 3. Build and push new container version
+# 4. Tag with semantic version (e.g., v1.1.0)
 ```
 
 2. **Deploy Changes:**
 ```bash
-# Upload new config and trigger rolling deployment
-terraform apply
-
-# Changes are automatically deployed with zero downtime
+# Update infrastructure with new container version
+container_image = "your-account.dkr.ecr.us-east-1.amazonaws.com/litellm-custom:v1.1.0"
+terraform apply -var-file="environments/$(terraform workspace show)/terraform.tfvars"
 ```
 
 ### Adding Model Providers
 
-#### Method 1: Configuration File (Recommended)
-Edit `examples/litellm-config.yaml`:
+#### Method 1: Container Configuration (Recommended)
+Edit configuration in litellm-app repository:
 
 ```yaml
 model_list:
@@ -442,15 +441,15 @@ terraform apply -var-file="environments/$(terraform workspace show)/terraform.tf
 
 ### Configuration File Management
 
+Configuration is now managed in the separate litellm-app repository:
+
 ```bash
-# View current configuration in S3
-aws s3 cp $(terraform output -raw config_s3_uri) - 
+# Configuration is baked into the custom container
+# No runtime configuration files to manage
+# Update configuration by building new container version in litellm-app repo
 
-# List configuration versions
-aws s3api list-object-versions --bucket $(terraform output -raw config_bucket_name) --prefix litellm-config.yaml
-
-# Download a specific version
-aws s3api get-object --bucket $(terraform output -raw config_bucket_name) --key litellm-config.yaml --version-id VERSION_ID config.yaml
+# Check current container image version
+aws ecs describe-task-definition --task-definition $(terraform output -raw ecs_cluster_name | cut -d'/' -f2)-task --query 'taskDefinition.containerDefinitions[0].image'
 ```
 
 ### Viewing Logs
@@ -503,13 +502,13 @@ aws rds describe-db-log-files \
    - Check CloudWatch logs for error messages
    - Verify SSM parameters are accessible
    - Check security group configurations
-   - Ensure S3 config file is accessible and valid
+   - Verify custom container can be pulled from ECR
 
-2. **Configuration File Issues**
-   - Verify config file syntax is valid YAML
-   - Check S3 bucket permissions for ECS task role
-   - Ensure config file exists in S3 bucket
-   - Review environment variables for S3 bucket/key names
+2. **Container Issues**
+   - Verify custom container image exists in ECR
+   - Check ECS task execution role has ECR pull permissions
+   - Ensure container includes required configuration and guardrails
+   - Verify container architecture matches ECS platform (linux/amd64)
 
 3. **Database Connection Issues**
    - Verify security group allows connections from ECS
@@ -520,7 +519,7 @@ aws rds describe-db-log-files \
    - Verify the health check path is correct
    - Check that the application is listening on the correct port
    - Review security group rules
-   - Ensure config file is properly loaded
+   - Ensure custom container started successfully
 
 ### Getting Help
 
@@ -539,13 +538,13 @@ aws ecs describe-services \
   --services $(terraform output -raw ecs_service_name) \
   --query 'services[0].events[:5]'
 
-# Verify configuration file in container
+# Verify custom container and guardrails
 aws ecs execute-command \
   --cluster $(terraform output -raw ecs_cluster_name) \
   --task TASK_ID \
   --container litellm \
   --interactive \
-  --command "cat /app/config.yaml"
+  --command "ls -la /app/guardrails/ && cat /app/config.yaml"
 ```
 
 ## Cleanup

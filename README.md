@@ -62,7 +62,7 @@ Your AWS credentials need permissions to create and manage:
 - ECS Cluster, Service, Task Definition
 - RDS Instance, DB Subnet Group, Parameter Group
 - Application Load Balancer, Target Group, Listener
-- S3 Bucket and Objects (for configuration storage)
+- ECR (for custom container registry access)
 - IAM Roles and Policies
 - SSM Parameters
 - Security Groups
@@ -209,8 +209,7 @@ terraform output alb_url
 # Get the auto-generated master key
 terraform output -raw litellm_master_key
 
-# Check configuration bucket
-terraform output config_s3_uri
+# Note: Configuration is now baked into container from litellm-app repository
 ```
 
 Test the deployment:
@@ -391,18 +390,17 @@ terraform output -raw litellm_master_key
 # Get SSM parameter names for external access
 terraform output secret_retrieval_commands
 
-# View configuration file location
-terraform output config_s3_uri
+# Note: Configuration is managed in separate litellm-app repository
 ```
 
 ### Configuration Management
 
-The deployment includes automated configuration management:
+Configuration is now managed via the separate litellm-app repository:
 
-- **S3 Storage**: Configuration file stored in versioned S3 bucket
-- **Automatic Updates**: Config changes trigger ECS redeployment
-- **Zero Downtime**: Rolling updates when configuration changes
-- **Version Control**: Git tracks config changes, S3 provides file versioning
+- **Container-Based Config**: Configuration and guardrails baked into custom container
+- **Version Control**: Container tags track configuration versions
+- **Zero Downtime**: Rolling updates when new container versions are deployed
+- **Separation of Concerns**: App team manages configuration, platform team manages infrastructure
 
 ### Scaling Configuration
 
