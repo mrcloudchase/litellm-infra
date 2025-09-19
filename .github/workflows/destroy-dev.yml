@@ -73,7 +73,8 @@ jobs:
 
       - name: Plan Destruction
         run: |
-          terraform plan -destroy -out=destroyplan
+          echo "Planning destruction (skipping refresh to avoid AWS API delays)..."
+          terraform plan -destroy -refresh=false -out=destroyplan
           echo "Resources to be destroyed:"
           terraform show destroyplan
 
