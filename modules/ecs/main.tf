@@ -63,7 +63,7 @@ resource "aws_ecs_task_definition" "main" {
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://localhost:11434/api/tags || exit 1"
+          "ollama list || exit 1"
         ]
         interval    = 30
         timeout     = 10
