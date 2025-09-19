@@ -20,7 +20,7 @@ graph TB
         subgraph "Private Subnets"
             subgraph "ECS Fargate Task"
                 LiteLLM[📦 LiteLLM Container<br/>Port 4000<br/>PII Guardrails]
-                Ollama[🤖 Ollama Container<br/>Port 11434<br/>llama3.2:3b]
+                Ollama[🤖 Ollama Container<br/>Port 11434<br/>llama3.2-3b]
             end
         end
 
@@ -63,7 +63,7 @@ graph LR
         subgraph "Shared Network Namespace"
             subgraph "Ollama Container"
                 OS[Ollama Server<br/>:11434]
-                Model[llama3.2:3b<br/>~2GB Model]
+                Model[llama3.2-3b<br/>~2GB Model]
                 HC1[Health Check<br/>ollama list]
             end
             
@@ -347,7 +347,7 @@ graph TB
     subgraph "Model Providers"
         subgraph "Local Models"
             Ollama[🤖 Ollama Server<br/>localhost:11434]
-            LocalModel[🧠 llama3.2:3b<br/>~2GB Model]
+            LocalModel[🧠 llama3.2-3b<br/>~2GB Model]
         end
         
         subgraph "Cloud Models"
@@ -542,7 +542,7 @@ graph TB
         subgraph "Container Distribution"
             subgraph "Ollama Container"
                 OllamaCPU[~1024 CPU<br/>Model Inference]
-                OllamaRAM[~3072 MB<br/>llama3.2:3b Model]
+                OllamaRAM[~3072 MB<br/>llama3.2-3b Model]
             end
             
             subgraph "LiteLLM Container"
@@ -594,7 +594,7 @@ stateDiagram-v2
     state Starting {
         [*] --> OllamaStarting: Ollama Container Starts
         OllamaStarting --> ModelPulling: ollama serve starts
-        ModelPulling --> OllamaHealthy: llama3.2:3b downloaded
+        ModelPulling --> OllamaHealthy: llama3.2-3b downloaded
         
         OllamaHealthy --> LiteLLMStarting: Dependency satisfied
         LiteLLMStarting --> ConfigLoading: Load baked config
@@ -697,7 +697,7 @@ sequenceDiagram
         
         alt Local Model Request
             LiteLLM->>Ollama: Forward to localhost:11434
-            Ollama->>Ollama: llama3.2:3b inference
+            Ollama->>Ollama: llama3.2-3b inference
             Ollama-->>LiteLLM: Model response
         else Cloud Model Request
             LiteLLM->>OpenAI: Forward with API key
@@ -837,7 +837,7 @@ graph LR
         
         subgraph "Ollama Container" 
             OllamaAPI[Ollama API<br/>:11434]
-            ModelEngine[Model Engine<br/>llama3.2:3b]
+            ModelEngine[Model Engine<br/>llama3.2-3b]
         end
         
         SharedNetwork[Shared Network<br/>localhost interface]
