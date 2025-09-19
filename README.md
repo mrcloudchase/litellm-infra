@@ -134,23 +134,31 @@ terraform output -raw litellm_master_key
 
 ## 🔄 Multi-Repository Architecture
 
-This infrastructure repository works with a separate `litellm-app` repository:
+This infrastructure repository works with a separate application repository:
 
 ### **litellm-infra** (This Repository):
+- **Repository**: `https://github.com/mrcloudchase/litellm-infra`
 - **Purpose**: AWS infrastructure management
 - **Contains**: Terraform modules, environment configs, CI/CD workflows
-- **Responsibilities**: VPC, ECS, RDS, ALB, security, networking
+- **Responsibilities**: VPC, ECS, RDS, ALB, security, networking, secret management
 
-### **litellm-app** (Separate Repository):
+### **litellm-app** (Application Repository):
+- **Repository**: `https://github.com/mrcloudchase/litellm-app`
 - **Purpose**: Application code and container building
 - **Contains**: Dockerfile, guardrails code, LiteLLM config, build workflows
-- **Responsibilities**: Container images, PII guardrails, model configurations
+- **Responsibilities**: Container images, PII guardrails, model configurations, guardrail logic
 
-### **Integration Flow:**
-1. **litellm-app** builds and pushes new container → ECR
-2. **Repository dispatch** triggers **litellm-infra** deployment
-3. **Infrastructure updates** with new container image
-4. **Multi-container deployment** with latest guardrails and models
+### **Repository Integration Flow:**
+1. **litellm-app** builds custom container with guardrails → pushes to ECR
+2. **Repository dispatch** automatically triggers **litellm-infra** deployment
+3. **litellm-infra** deploys infrastructure with new container image
+4. **Multi-container ECS task** runs LiteLLM + Ollama with latest configuration
+
+### **Supported Model Types:**
+- **Local models**: Served via Ollama container (llama3.2:3b)
+- **Cloud models**: OpenAI, Anthropic, Azure OpenAI via API keys
+- **PII guardrails**: Applied to all models (pre-call and post-call)
+- **Mixed workloads**: Can route to local or cloud models based on request
 
 ## 🐳 Multi-Container Configuration
 
@@ -197,9 +205,31 @@ This infrastructure repository works with a separate `litellm-app` repository:
 
 ## 🔧 Configuration Management
 
-### **Environment Variables:**
-Core configuration via terraform.tfvars:
+### **Two-Repository Configuration Flow:**
 
+#### **litellm-app Repository** (Application Configuration):
+- **litellm-config.yaml**: Model definitions and routing rules
+- **Guardrail files**: PII detection logic (regex + Presidio)
+- **Dockerfile**: Container build with embedded configuration
+- **GitHub Actions**: Builds and pushes to ECR, triggers infrastructure deployment
+
+#### **litellm-infra Repository** (Infrastructure Configuration):
+- **terraform.tfvars**: Resource allocation, security, API keys
+- **GitHub Actions**: Infrastructure deployment and management
+- **Terraform modules**: AWS resource definitions
+
+### **API Key Management Flow:**
+```
+GitHub Secrets → Terraform → SSM Parameter Store → ECS Environment Variables → LiteLLM Container
+```
+
+**Example Flow:**
+1. `OPENAI_API_KEY` (GitHub secret)
+2. → `openai-api-key` (SSM SecureString parameter)
+3. → `OPENAI_API_KEY` (container environment variable)
+4. → `os.environ/OPENAI_API_KEY` (litellm-config.yaml reference)
+
+### **Current Environment Variables:**
 ```hcl
 # Multi-container resource allocation
 ecs_cpu    = 2048  # CPU units for both containers
@@ -209,10 +239,10 @@ ecs_memory = 6144  # Memory in MB for model serving
 allowed_cidr_blocks = ["68.76.147.104/32"]  # Restrict to your IP
 
 # Container image (automatically managed via repository dispatch)
-container_image = "your-account.dkr.ecr.us-east-1.amazonaws.com/litellm-guardrails:latest"
+container_image = "734184332381.dkr.ecr.us-east-1.amazonaws.com/litellm-guardrails:latest"
 ```
 
-### **API Keys:**
+### **API Keys Configuration:**
 ```hcl
 additional_ssm_parameters = {
   "openai-api-key" = {
@@ -220,14 +250,31 @@ additional_ssm_parameters = {
     type        = "SecureString"
     description = "OpenAI API Key for LiteLLM"
   }
+  # Add additional providers as needed
 }
 ```
 
-### **Model Configuration:**
-Model configuration is managed in the litellm-app repository and baked into the container image. The container includes:
-- **Cloud models**: OpenAI, Anthropic, etc. via API keys
-- **Local models**: llama3.2:3b via Ollama container
-- **PII guardrails**: Regex-based detection for sensitive data
+### **Model Configuration (litellm-app repository):**
+```yaml
+# litellm-app/litellm-config.yaml
+model_list:
+  - model_name: llama3.2-3b
+    litellm_params:
+      model: ollama/llama3.2:3b
+      api_base: http://localhost:11434  # Ollama container
+
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY  # From SSM parameter
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  health_check: true
+  set_verbose: false
+  json_logs: true
+```
 
 ## 📊 Cost Breakdown (Monthly)
 

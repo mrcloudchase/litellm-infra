@@ -306,11 +306,131 @@ general_settings:
 ```
 
 ### **Adding New Models:**
-To add new models, update the litellm-app repository:
+To add new models, you need to update both repositories:
 
-1. **Edit litellm-config.yaml** in litellm-app
-2. **Add API keys** to litellm-infra terraform.tfvars
-3. **Push changes** → triggers automatic deployment
+#### **Step 1: Add Model Configuration (litellm-app repository)**
+```bash
+# Clone or navigate to your litellm-app repository
+git clone https://github.com/mrcloudchase/litellm-app.git
+cd litellm-app
+
+# Edit the LiteLLM configuration file
+vim litellm-config.yaml
+```
+
+Add your new model to the configuration:
+```yaml
+model_list:
+  # Existing local model
+  - model_name: llama3.2-3b
+    litellm_params:
+      model: ollama/llama3.2:3b
+      api_base: http://localhost:11434
+
+  # Add new OpenAI model
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  # Add new Anthropic model
+  - model_name: claude-3-5-sonnet
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20241022
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # Add new Azure OpenAI model
+  - model_name: azure-gpt-4o
+    litellm_params:
+      model: azure/gpt-4o
+      api_base: os.environ/AZURE_API_BASE
+      api_key: os.environ/AZURE_API_KEY
+      api_version: "2024-02-01"
+```
+
+#### **Step 2: Add API Keys (litellm-infra repository)**
+```bash
+# Navigate to your litellm-infra repository
+cd /path/to/litellm-infra
+
+# Edit your environment configuration
+vim environments/dev/terraform.tfvars
+```
+
+Add the required API keys:
+```hcl
+additional_ssm_parameters = {
+  # Existing OpenAI key
+  "openai-api-key" = {
+    value       = "sk-proj-your-openai-key-here"
+    type        = "SecureString"
+    description = "OpenAI API Key for LiteLLM"
+  }
+  
+  # Add new Anthropic key
+  "anthropic-api-key" = {
+    value       = "sk-ant-your-anthropic-key-here"
+    type        = "SecureString"
+    description = "Anthropic API Key for Claude models"
+  }
+  
+  # Add new Azure OpenAI keys
+  "azure-api-key" = {
+    value       = "your-azure-openai-key-here"
+    type        = "SecureString"
+    description = "Azure OpenAI API Key"
+  }
+  
+  "azure-api-base" = {
+    value       = "https://your-resource.openai.azure.com/"
+    type        = "String"
+    description = "Azure OpenAI API Base URL"
+  }
+}
+```
+
+#### **Step 3: Deploy Changes**
+```bash
+# In litellm-app repository - build and push new container
+git add litellm-config.yaml
+git commit -m "Add new models: gpt-4o-mini, claude-3-5-sonnet, azure-gpt-4o"
+git push origin main
+# This triggers ECR build and repository dispatch to litellm-infra
+
+# In litellm-infra repository - update API keys
+git add environments/dev/terraform.tfvars
+git commit -m "Add API keys for new models"
+git push origin main
+# This triggers infrastructure update with new SSM parameters
+```
+
+#### **Step 4: Verify Model Availability**
+```bash
+# Wait for deployment to complete, then test
+ALB_URL=$(terraform output -raw alb_url)
+MASTER_KEY=$(terraform output -raw litellm_master_key)
+
+# List available models
+curl -H "Authorization: Bearer $MASTER_KEY" "$ALB_URL/v1/models"
+
+# Test new OpenAI model
+curl -X POST "$ALB_URL/v1/chat/completions" \
+  -H "Authorization: Bearer $MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello from OpenAI!"}]
+  }'
+
+# Test new Anthropic model
+curl -X POST "$ALB_URL/v1/chat/completions" \
+  -H "Authorization: Bearer $MASTER_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-3-5-sonnet",
+    "messages": [{"role": "user", "content": "Hello from Anthropic!"}]
+  }'
+```
 
 ## 📊 Monitoring and Maintenance
 
@@ -406,20 +526,53 @@ aws logs filter-log-events \
 
 ### **Health Check Issues:**
 
-1. **401 Unauthorized on /health:**
+1. **503 Service Unavailable:**
+```bash
+# Check ALB target health (most common cause)
+aws elbv2 describe-target-health \
+  --target-group-arn $(aws elbv2 describe-target-groups \
+    --names litellm-dev-ci-tg \
+    --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+# Common 503 causes:
+# - "initial" + "Elb.RegistrationInProgress": Containers still starting
+# - "unhealthy" + "Target.FailedHealthChecks": Health checks failing
+# - "draining": Old tasks being replaced
+
+# Check if containers are running
+aws ecs describe-services \
+  --cluster $(terraform output -raw ecs_cluster_name) \
+  --services $(terraform output -raw ecs_service_name) \
+  --query 'services[0].{runningCount:runningCount,pendingCount:pendingCount}'
+
+# Check container health status
+aws ecs describe-tasks \
+  --cluster $(terraform output -raw ecs_cluster_name) \
+  --tasks $(aws ecs list-tasks --cluster $(terraform output -raw ecs_cluster_name) --query 'taskArns[0]' --output text) \
+  --query 'tasks[0].containers[*].{name:name,healthStatus:healthStatus,lastStatus:lastStatus}'
+```
+
+2. **401 Unauthorized on /health:**
 ```bash
 # Health endpoint requires authentication
 curl -H "Authorization: Bearer $(terraform output -raw litellm_master_key)" \
   "$(terraform output -raw alb_url)/health"
 ```
 
-2. **503 Service Unavailable:**
+3. **Multi-Container Startup Timing:**
 ```bash
-# Check if containers are running
-aws ecs describe-services \
-  --cluster $(terraform output -raw ecs_cluster_name) \
-  --services $(terraform output -raw ecs_service_name) \
-  --query 'services[0].{runningCount:runningCount,pendingCount:pendingCount}'
+# Ollama container needs time to pull the 2GB llama3.2:3b model
+# Expected startup time: 3-5 minutes for model download
+# Check Ollama model pull progress:
+aws logs filter-log-events \
+  --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --filter-pattern "pulling" \
+  --start-time $(date -v-10M +%s)000
+
+# Wait for "Model pulled successfully" message:
+aws logs filter-log-events \
+  --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --filter-pattern "Model pulled successfully"
 ```
 
 ### **Network Access Issues:**
