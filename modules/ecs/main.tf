@@ -44,8 +44,12 @@ resource "aws_ecs_task_definition" "main" {
         }
       ]
 
+      # Note: Custom container from litellm-app repo includes:
+      # - AWS CLI for config download
+      # - PII guardrails pre-installed
+      # - Startup script that downloads config from S3
       command = [
-        "sh", "-c", 
+        "sh", "-c",
         "aws s3 cp s3://$S3_CONFIG_BUCKET/$S3_CONFIG_KEY /app/config.yaml && litellm --config /app/config.yaml --port ${var.container_port}"
       ]
 

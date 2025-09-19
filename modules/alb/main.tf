@@ -36,7 +36,6 @@ resource "aws_lb_target_group" "main" {
   deregistration_delay             = var.deregistration_delay
   load_balancing_algorithm_type    = "round_robin"
   slow_start                       = 0
-  preserve_client_ip               = false
 
   health_check {
     enabled             = true

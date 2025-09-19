@@ -48,3 +48,6 @@ resource "aws_s3_object" "litellm_config" {
     Name = "${var.name_prefix}-litellm-config"
   })
 }
+
+# Note: Guardrail files are now baked into the custom container
+# Built and managed in the separate litellm-app repository

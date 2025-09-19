@@ -26,7 +26,7 @@ allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
 
 # LiteLLM Configuration
 litellm_port    = 4000
-container_image = "ghcr.io/berriai/litellm:main-stable"
+container_image = "ghcr.io/berriai/litellm:main-stable"  # Use custom image from litellm-app repo for PII guardrails
 
 # Database Configuration
 database_name     = "litellm"

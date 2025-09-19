@@ -94,6 +94,10 @@ general_settings:
   #   - ["gpt-4o", "gpt-4o-mini"]
   #   - ["claude-3-5-sonnet", "claude-3-haiku"]
 
+# Note: PII Detection Guardrails are configured in the custom container
+# Built and managed in the separate litellm-app repository
+# Guardrails are automatically loaded when using the custom container image
+
 # Advanced Features (Optional - Uncomment as needed)
 
 # Optional: Router settings for load balancing multiple models
