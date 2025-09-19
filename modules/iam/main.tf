@@ -172,5 +172,35 @@ resource "aws_iam_role_policy_attachment" "ecs_task_cloudwatch_policy_attachment
   policy_arn = aws_iam_policy.ecs_task_cloudwatch_policy.arn
 }
 
+# Bedrock policy for task role
+resource "aws_iam_policy" "ecs_task_bedrock_policy" {
+  name        = "${var.name_prefix}-ecs-task-bedrock-policy"
+  description = "Policy for ECS tasks to access AWS Bedrock models"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ]
+        Resource = [
+          "arn:aws:bedrock:*::foundation-model/*"
+        ]
+      }
+    ]
+  })
+
+  tags = var.tags
+}
+
+# Attach Bedrock policy to task role
+resource "aws_iam_role_policy_attachment" "ecs_task_bedrock_policy_attachment" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.ecs_task_bedrock_policy.arn
+}
+
 # Note: S3 policy removed - configuration is now baked into container
 # No S3 access needed for configuration files
