@@ -74,7 +74,10 @@ jobs:
       - name: Plan Destruction
         run: |
           echo "Planning destruction (skipping refresh to avoid AWS API delays)..."
-          terraform plan -destroy -refresh=false -out=destroyplan
+          terraform plan -destroy -refresh=false -out=destroyplan || {
+            echo "Plan failed, likely due to state lock. Attempting to break lock and retry..."
+            terraform plan -destroy -refresh=false -lock=false -out=destroyplan
+          }
           echo "Resources to be destroyed:"
           terraform show destroyplan
 
