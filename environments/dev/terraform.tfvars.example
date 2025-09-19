@@ -1,15 +1,16 @@
 # Development Environment Configuration
+# This file is used for both manual deployments and CI/CD via GitHub Actions
 
 # General Settings
 aws_region   = "us-east-1"
-name_prefix  = "litellm-dev"
+name_prefix  = "litellm-dev-ci"  # CI deployments use dev-ci prefix for isolation
 
 # Default tags for all resources
 default_tags = {
   Environment = "dev"
   Project     = "litellm"
-  ManagedBy   = "terraform"
-  Owner       = "your-team"
+  ManagedBy   = "terraform-ci"  # Indicates CI/CD managed resources
+  Owner       = "github-actions"
   CostCenter  = "engineering"
 }
 
@@ -21,12 +22,12 @@ database_subnet_cidrs    = ["10.0.100.0/24", "10.0.200.0/24"]
 enable_nat_gateway       = true
 single_nat_gateway       = true  # Cost optimization for dev
 
-# Security Configuration
-allowed_cidr_blocks = ["0.0.0.0/0"]  # Restrict this in production
+# Security Configuration  
+allowed_cidr_blocks = ["68.76.147.104/32"]  # Restrict to your IP only
 
 # LiteLLM Configuration
 litellm_port    = 4000
-container_image = "ghcr.io/berriai/litellm:main-stable"  # Use custom image from litellm-app repo for PII guardrails
+container_image = "734184332381.dkr.ecr.us-east-1.amazonaws.com/litellm-guardrails:latest"  # Custom ECR image with PII guardrails
 
 # Database Configuration
 database_name     = "litellm"
@@ -67,13 +68,13 @@ environment_variables = {
 }
 
 # API Keys for LiteLLM Models
-# REQUIRED: Add your OpenAI API key for the default gpt-4o-mini model
+# Note: For CI/CD deployments, these values are automatically replaced with GitHub secrets
 additional_ssm_parameters = {
-  # Required: OpenAI API key for gpt-4o-mini model (default in config)
+  # Required: OpenAI API key for cloud models
   "openai-api-key" = {
-    value       = "sk-proj-your-openai-api-key-here"
+    value       = "PLACEHOLDER_REPLACED_BY_GITHUB_ACTIONS"  # Replaced with secrets.OPENAI_API_KEY
     type        = "SecureString"
-    description = "OpenAI API Key for LiteLLM"
+    description = "OpenAI API Key for LiteLLM Dev"
   }
   
   # Optional: Uncomment additional providers as needed
