@@ -258,18 +258,18 @@ graph TB
         end
     end
 
-    Dev -->|1. Code Changes| AppCode
+    Dev -->|Code Changes| AppCode
     AppCode --> Dockerfile
     Dockerfile --> AppCI
-    AppCI -->|2. Build & Push| ECR
-    AppCI -->|3. Repository Dispatch| InfraCI
+    AppCI -->|Build and Push| ECR
+    AppCI -->|Repository Dispatch| InfraCI
     
-    Dev -->|4. Infrastructure Changes| TerraformCode
+    Dev -->|Infrastructure Changes| TerraformCode
     TerraformCode --> InfraCI
-    InfraCI <-->|5. State Management| S3
-    InfraCI <-->|6. Locking| DynamoDB
-    InfraCI -->|7. Deploy| ECS
-    ECS <-->|8. Pull Images| ECR
+    InfraCI <-->|State Management| S3
+    InfraCI <-->|Locking| DynamoDB
+    InfraCI -->|Deploy| ECS
+    ECS <-->|Pull Images| ECR
 
     classDef repo fill:#e3f2fd
     classDef aws fill:#fff3e0
