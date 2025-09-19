@@ -66,6 +66,19 @@ jobs:
             exit 0
           }
 
+      - name: Create Terraform Variables
+        run: |
+          echo "Creating terraform.tfvars for destroy operations..."
+          cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+          
+          # Replace container image placeholder (not critical for destroy, but needed for validation)
+          sed -i 's|container_image = ".*"|container_image = "ghcr.io/berriai/litellm:main-stable"|' environments/dev/terraform.tfvars
+          
+          # Replace OpenAI API key placeholder (not critical for destroy, but needed for validation)
+          sed -i 's|PLACEHOLDER_REPLACED_BY_GITHUB_ACTIONS|dummy-key-for-destroy|' environments/dev/terraform.tfvars
+          
+          echo "Terraform variables prepared for destroy operations"
+
       - name: Show Current Resources
         run: |
           echo "Current resources in dev-ci workspace:"
@@ -75,18 +88,19 @@ jobs:
         timeout-minutes: 5
         run: |
           echo "Planning destruction (skipping refresh to avoid AWS API delays)..."
-          terraform plan -destroy -refresh=false -out=destroyplan || {
+          terraform plan -destroy -refresh=false -var-file="environments/dev/terraform.tfvars" -out=destroyplan || {
             echo "Plan failed, trying with lock disabled..."
-            terraform plan -destroy -refresh=false -lock=false -out=destroyplan || {
+            terraform plan -destroy -refresh=false -lock=false -var-file="environments/dev/terraform.tfvars" -out=destroyplan || {
               echo "Standard plan failed, attempting targeted destruction..."
               terraform plan -destroy -refresh=false -lock=false \
+                -var-file="environments/dev/terraform.tfvars" \
                 -target=module.alb \
                 -target=module.ecs \
                 -target=module.rds \
                 -target=module.vpc \
                 -out=destroyplan || {
                 echo "All plan attempts failed. Proceeding with force destroy..."
-                terraform destroy -refresh=false -lock=false -auto-approve || echo "Force destroy completed with warnings"
+                terraform destroy -refresh=false -lock=false -var-file="environments/dev/terraform.tfvars" -auto-approve || echo "Force destroy completed with warnings"
                 exit 0
               }
             }
