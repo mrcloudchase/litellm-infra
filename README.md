@@ -1,577 +1,434 @@
 # LiteLLM Infrastructure on AWS
 
-This repository contains a modular Terraform configuration for deploying [LiteLLM](https://docs.litellm.ai/) on AWS using ECS, RDS, ALB, SSM, and IAM. The infrastructure is designed to be reusable across multiple environments (dev, staging, production).
+This repository contains a modular Terraform configuration for deploying [LiteLLM](https://docs.litellm.ai/) on AWS using a multi-container ECS setup with local AI model serving capabilities. The infrastructure supports both cloud-based and local AI models with built-in PII detection guardrails.
 
-## Architecture
+## 🏗️ Architecture Overview
 
-The deployment creates the following AWS resources:
+The deployment creates a production-ready, multi-container setup with:
 
+### **Core Infrastructure:**
 - **VPC**: Custom VPC with public, private, and database subnets across multiple AZs
-- **ECS**: Fargate cluster running the LiteLLM container with auto-scaling
-- **RDS**: PostgreSQL database for LiteLLM data persistence
-- **ALB**: Application Load Balancer for traffic distribution
-- **Configuration**: Managed via custom container from separate litellm-app repository
-- **SSM**: Parameter Store for secure secrets management
-- **IAM**: Roles and policies for secure access
-- **Security Groups**: Network security rules for each component
+- **ECS Fargate**: Multi-container tasks running LiteLLM + Ollama
+- **RDS PostgreSQL**: Database for LiteLLM data persistence
+- **Application Load Balancer**: Traffic distribution and SSL termination
+- **SSM Parameter Store**: Secure secrets management
+- **IAM**: Least-privilege roles and policies
+- **CloudWatch**: Centralized logging and monitoring
 
-## Directory Structure
+### **Multi-Container Setup:**
+- **LiteLLM Container**: API proxy with PII guardrails (custom ECR image)
+- **Ollama Container**: Local AI model server (llama3.2:3b)
+- **Shared Networking**: Containers communicate via localhost
+- **Resource Allocation**: 2048 CPU, 6144 MB memory for model serving
+
+### **CI/CD Integration:**
+- **Repository Dispatch**: Automatic deployments from litellm-app repository
+- **GitHub Actions**: Automated infrastructure management
+- **Multi-Repository Architecture**: Separation of app and infrastructure concerns
+
+## 📁 Directory Structure
 
 ```
-.
-├── modules/                    # Reusable Terraform modules
-│   ├── vpc/                   # VPC and networking
-│   ├── security-groups/       # Security groups for all components
-│   ├── iam/                   # IAM roles and policies
-│   ├── ssm/                   # SSM Parameter Store
-│   ├── rds/                   # PostgreSQL database
-│   ├── alb/                   # Application Load Balancer
-│   └── ecs/                   # ECS cluster and service
-├── environments/              # Environment-specific configurations
+litellm-infra/
+├── .github/
+│   └── workflows/
+│       ├── deploy-dev.yml         # CI/CD deployment workflow
+│       └── destroy-dev.yml        # Environment cleanup workflow
+├── modules/                       # Reusable Terraform modules
+│   ├── vpc/                      # VPC and networking resources
+│   ├── security-groups/          # Security groups for all components
+│   ├── iam/                      # IAM roles and policies
+│   ├── ssm/                      # SSM Parameter Store management
+│   ├── rds/                      # PostgreSQL database
+│   ├── alb/                      # Application Load Balancer
+│   └── ecs/                      # Multi-container ECS cluster and service
+├── environments/                  # Environment-specific configurations
 │   ├── dev/
-│   │   ├── terraform.tfvars.example
-│   │   └── .gitignore
+│   │   └── terraform.tfvars.example
 │   ├── staging/
-│   │   ├── terraform.tfvars.example
-│   │   └── .gitignore
+│   │   └── terraform.tfvars.example
 │   └── prod/
-│       ├── terraform.tfvars.example
-│       └── .gitignore
-├── examples/                  # Example configurations and templates
-│   ├── backend.tf.example     # Backend configuration template
-│   └── litellm-config.yaml    # LiteLLM configuration file
-├── main.tf                    # Main Terraform configuration
-├── variables.tf               # Input variables
-├── outputs.tf                 # Output values
-├── backend.tf                 # Backend configuration (gitignored)
-├── .gitignore                 # Git ignore rules
-└── README.md                  # This file
+│       └── terraform.tfvars.example
+├── examples/
+│   └── backend.tf.example        # Backend configuration template
+├── main.tf                       # Main Terraform configuration
+├── variables.tf                  # Input variables
+├── outputs.tf                    # Output values
+├── backend.tf                    # Backend configuration (gitignored)
+├── README.md                     # This file
+└── DEPLOYMENT.md                 # Detailed deployment guide
 ```
 
-## Prerequisites
+## 🚀 Quick Start
+
+### Prerequisites
 
 1. **AWS CLI** configured with appropriate credentials
 2. **Terraform** >= 1.0 installed
-3. **AWS IAM permissions** for creating the required resources
-4. **Terraform backend setup** (S3 bucket and DynamoDB table for state management)
+3. **GitHub CLI** (for CI/CD setup)
+4. **AWS IAM permissions** for creating the required resources
 
 ### Required AWS Permissions
 
 Your AWS credentials need permissions to create and manage:
 - VPC, Subnets, Internet Gateway, NAT Gateway, Route Tables
-- ECS Cluster, Service, Task Definition
+- ECS Cluster, Service, Task Definition (multi-container)
 - RDS Instance, DB Subnet Group, Parameter Group
 - Application Load Balancer, Target Group, Listener
 - ECR (for custom container registry access)
 - IAM Roles and Policies
-- SSM Parameters
+- SSM Parameters (SecureString)
 - Security Groups
 - CloudWatch Log Groups
 
-## Quick Start
-
-### 1. Clone and Setup Backend
+### Setup Terraform Backend (One-time)
 
 ```bash
-git clone <your-repo-url>
-cd litellm-infra
-```
-
-**Important**: Before deploying the infrastructure, you need to set up Terraform remote state management to avoid the chicken-and-egg problem.
-
-#### Setup Terraform Backend (One-time)
-
-1. **Generate unique resource names:**
-```bash
-# Generate unique names for your backend resources
+# 1. Generate unique resource names:
 BUCKET_NAME="litellm-terraform-state-$(openssl rand -hex 4)"
 DYNAMODB_TABLE="litellm-terraform-locks-$(openssl rand -hex 4)"
-echo "S3 Bucket: $BUCKET_NAME"
-echo "DynamoDB Table: $DYNAMODB_TABLE"
-```
 
-2. **Create backend resources manually:**
-```bash
-# Set variables
-export AWS_REGION="us-east-1"  # or your preferred region
-
-# Create S3 bucket
+# 2. Create backend resources manually:
+export AWS_REGION="us-east-1"
 aws s3api create-bucket --bucket $BUCKET_NAME --region $AWS_REGION
-
-# Enable versioning
 aws s3api put-bucket-versioning --bucket $BUCKET_NAME --versioning-configuration Status=Enabled
-
-# Enable encryption
 aws s3api put-bucket-encryption --bucket $BUCKET_NAME --server-side-encryption-configuration '{
   "Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
 }'
-
-# Block public access
 aws s3api put-public-access-block --bucket $BUCKET_NAME --public-access-block-configuration \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 
-# Create DynamoDB table
 aws dynamodb create-table \
   --table-name $DYNAMODB_TABLE \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
   --region $AWS_REGION
-```
 
-3. **Configure Terraform backend:**
-```bash
-# Copy backend template
+# 3. Configure Terraform backend:
 cp examples/backend.tf.example backend.tf
+vim backend.tf  # Update bucket and dynamodb_table values
 
-# Edit with your actual bucket and table names
-vim backend.tf
-```
-
-4. **Initialize Terraform:**
-```bash
-# Initialize with remote state
+# 4. Initialize Terraform:
 terraform init
 ```
 
-### 2. Create Terraform Workspace
+### Deploy Infrastructure
 
 ```bash
-# Create and switch to your environment workspace
+# 1. Create workspace:
 terraform workspace new dev
 
-# Or use existing environments
-# terraform workspace new staging
-# terraform workspace new prod
-```
-
-### 3. Configure Environment
-
-```bash
-# Copy the environment configuration template
+# 2. Configure environment:
 cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
+vim environments/dev/terraform.tfvars  # Update with your values
 
-# Edit with your specific values
-vim environments/dev/terraform.tfvars
+# 3. Deploy:
+terraform plan -var-file="environments/dev/terraform.tfvars"
+terraform apply -var-file="environments/dev/terraform.tfvars"
+
+# 4. Get deployment information:
+terraform output alb_url
+terraform output -raw litellm_master_key
 ```
 
-Update the configuration with your values:
+## 🔄 Multi-Repository Architecture
+
+This infrastructure repository works with a separate `litellm-app` repository:
+
+### **litellm-infra** (This Repository):
+- **Purpose**: AWS infrastructure management
+- **Contains**: Terraform modules, environment configs, CI/CD workflows
+- **Responsibilities**: VPC, ECS, RDS, ALB, security, networking
+
+### **litellm-app** (Separate Repository):
+- **Purpose**: Application code and container building
+- **Contains**: Dockerfile, guardrails code, LiteLLM config, build workflows
+- **Responsibilities**: Container images, PII guardrails, model configurations
+
+### **Integration Flow:**
+1. **litellm-app** builds and pushes new container → ECR
+2. **Repository dispatch** triggers **litellm-infra** deployment
+3. **Infrastructure updates** with new container image
+4. **Multi-container deployment** with latest guardrails and models
+
+## 🐳 Multi-Container Configuration
+
+### **Container 1: Ollama (Local AI Model Server)**
+- **Image**: `ollama/ollama:latest`
+- **Port**: 11434
+- **Purpose**: Serves llama3.2:3b model locally
+- **Startup**: Automatically pulls and loads the model
+- **Health Check**: `ollama list`
+- **Resources**: ~3GB memory for model
+
+### **Container 2: LiteLLM (API Proxy + Guardrails)**
+- **Image**: Custom ECR image with PII guardrails
+- **Port**: 4000 (exposed via ALB)
+- **Purpose**: API proxy with PII detection
+- **Dependencies**: Waits for Ollama to be healthy
+- **Configuration**: Baked into container image
+- **API Base**: `http://localhost:11434` for Ollama communication
+
+### **Resource Allocation:**
+- **Development**: 2048 CPU, 6144 MB memory
+- **Staging**: 2048 CPU, 6144 MB memory  
+- **Production**: 4096 CPU, 8192 MB memory
+
+## 🛡️ Security Features
+
+### **Network Security:**
+- **Private subnets**: ECS tasks isolated from internet
+- **IP restrictions**: ALB access limited to specific CIDR blocks
+- **Security groups**: Granular network access control
+- **VPC isolation**: Database in dedicated subnets
+
+### **Secret Management:**
+- **Auto-generated secrets**: Master key, salt key, database password
+- **SSM Parameter Store**: SecureString encryption for all secrets
+- **Unique per environment**: Separate secrets for dev/staging/prod
+- **No manual secret handling**: Fully automated generation
+
+### **Container Security:**
+- **Custom guardrails**: Built-in PII detection (email, SSN, phone, credit card)
+- **Non-root execution**: Secure container runtime
+- **Health checks**: Automated container health monitoring
+- **Least privilege**: Minimal IAM permissions
+
+## 🔧 Configuration Management
+
+### **Environment Variables:**
+Core configuration via terraform.tfvars:
 
 ```hcl
-# Required values to configure
-name_prefix = "your-project-name"
+# Multi-container resource allocation
+ecs_cpu    = 2048  # CPU units for both containers
+ecs_memory = 6144  # Memory in MB for model serving
 
-# Update tags
-default_tags = {
-  Environment = "dev"
-  Project     = "your-project"
-  Owner       = "your-team"
-}
+# Security configuration
+allowed_cidr_blocks = ["68.76.147.104/32"]  # Restrict to your IP
 
-# Add your API keys (these will be stored securely in SSM)
+# Container image (automatically managed via repository dispatch)
+container_image = "your-account.dkr.ecr.us-east-1.amazonaws.com/litellm-guardrails:latest"
+```
+
+### **API Keys:**
+```hcl
 additional_ssm_parameters = {
   "openai-api-key" = {
     value       = "sk-proj-your-openai-key-here"
     type        = "SecureString"
     description = "OpenAI API Key for LiteLLM"
   }
-  "anthropic-api-key" = {
-    value       = "sk-ant-your-anthropic-key-here"
-    type        = "SecureString"
-    description = "Anthropic API Key for LiteLLM"
-  }
 }
-
-# Secrets are auto-generated - no manual input needed!
-# LiteLLM master key, salt key, and database password are 
-# automatically generated using Terraform's random provider
 ```
 
-### 4. Deploy Infrastructure
+### **Model Configuration:**
+Model configuration is managed in the litellm-app repository and baked into the container image. The container includes:
+- **Cloud models**: OpenAI, Anthropic, etc. via API keys
+- **Local models**: llama3.2:3b via Ollama container
+- **PII guardrails**: Regex-based detection for sensitive data
 
+## 📊 Cost Breakdown (Monthly)
+
+### **Development Environment:**
+- **ECS Fargate** (2048 CPU, 6144 MB): ~$78.53
+- **NAT Gateway**: ~$33.30
+- **Application Load Balancer**: ~$19.35
+- **RDS PostgreSQL** (db.t3.micro): ~$15.92
+- **CloudWatch Logs**: ~$0.65
+- **ECR Storage**: ~$0.20
+- **Total**: **~$148/month**
+
+### **Cost Optimization Options:**
+- **Scheduled shutdown**: Run only during work hours (~$96/month)
+- **Smaller model**: Use llama3.2:1b instead of 3b (~$133/month)
+- **Spot instances**: Use Fargate Spot pricing (~$93/month)
+
+## 🚀 CI/CD Workflows
+
+### **Automated Deployment (deploy-dev.yml):**
+**Triggers:**
+- Push to main branch (infrastructure changes)
+- Manual workflow dispatch
+- Repository dispatch from litellm-app (new container images)
+
+**Features:**
+- **Smart image selection**: Uses repository dispatch payload or fallback secret
+- **Terraform workspace isolation**: Separate dev-ci workspace for CI/CD
+- **Health endpoint testing**: Automated verification
+- **Deployment traceability**: Shows trigger source and container details
+
+### **Environment Cleanup (destroy-dev.yml):**
+**Triggers:**
+- Manual workflow dispatch with confirmation
+
+**Features:**
+- **Confirmation required**: Must type "DESTROY" to proceed
+- **Workspace cleanup**: Removes empty workspaces
+- **Resource verification**: Shows what will be destroyed
+- **Safety checks**: Prevents accidental destruction
+
+## 🔗 Integration with litellm-app
+
+### **Repository Dispatch Flow:**
+1. **litellm-app** builds new container with guardrails
+2. **Pushes to ECR** with commit-based tagging
+3. **Triggers repository dispatch** with image URI
+4. **litellm-infra** receives dispatch and deploys new image
+5. **Multi-container task** updates with latest guardrails
+
+### **Image Tagging Strategy:**
+- **`latest`**: Most recent build (for manual deployments)
+- **`commit-sha`**: Immutable commit-based tags (for traceability)
+- **Repository dispatch**: Uses specific commit-sha
+- **Manual deployments**: Uses latest from ECR
+
+## 🧪 Testing and Verification
+
+### **Health Checks:**
 ```bash
-# Ensure you're in the correct workspace
-terraform workspace show
+# Get ALB URL
+ALB_URL=$(terraform output -raw alb_url)
 
-# Deploy using workspace-specific configuration
-terraform plan -var-file="environments/dev/terraform.tfvars"
-terraform apply -var-file="environments/dev/terraform.tfvars"
-```
+# Test health endpoint (may require authentication)
+curl "$ALB_URL/health"
 
-### 5. Access LiteLLM
-
-After deployment, get the ALB URL and auto-generated master key:
-
-```bash
-# Get the load balancer URL
-terraform output alb_url
-
-# Get the auto-generated master key
-terraform output -raw litellm_master_key
-
-# Note: Configuration is now baked into container from litellm-app repository
-```
-
-Test the deployment:
-
-```bash
-# Store the master key in a variable
+# Test model inference
 MASTER_KEY=$(terraform output -raw litellm_master_key)
-
-# Test the health endpoint
-curl "$(terraform output -raw alb_url)/health"
-
-# Test the API with a configured model
-curl -X POST "$(terraform output -raw alb_url)/v1/chat/completions" \
-  -H "Content-Type: application/json" \
+curl -X POST "$ALB_URL/v1/chat/completions" \
   -H "Authorization: Bearer $MASTER_KEY" \
+  -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o",
+    "model": "llama3.2-3b",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
 
-## Environment Management with Workspaces
-
-### Workspace-Based Deployment (Recommended)
-
-This project uses Terraform workspaces to manage multiple environments with isolated state:
-
+### **Container Status:**
 ```bash
-# List available workspaces
-terraform workspace list
-
-# Create new workspace for environment
-terraform workspace new dev
-terraform workspace new staging
-terraform workspace new prod
-
-# Switch between environments
-terraform workspace select dev
-terraform workspace show  # Verify current workspace
-```
-
-### Development Environment
-
-```bash
-# Switch to dev workspace
-terraform workspace select dev
-
-# Configure development environment
-cp environments/dev/terraform.tfvars.example environments/dev/terraform.tfvars
-vim environments/dev/terraform.tfvars
-
-# Deploy with cost optimizations
-terraform plan -var-file="environments/dev/terraform.tfvars"
-terraform apply -var-file="environments/dev/terraform.tfvars"
-```
-
-Development environment features:
-- Single NAT Gateway for cost savings
-- Smaller RDS instance (`db.t3.micro`)
-- No deletion protection
-- ECS Exec enabled for debugging
-- Auto-generated secrets unique to dev environment
-
-### Production Environment
-
-```bash
-# Switch to prod workspace
-terraform workspace select prod
-
-# Configure production environment
-cp environments/prod/terraform.tfvars.example environments/prod/terraform.tfvars
-vim environments/prod/terraform.tfvars
-
-# Deploy with high availability
-terraform plan -var-file="environments/prod/terraform.tfvars"
-terraform apply -var-file="environments/prod/terraform.tfvars"
-```
-
-Production environment features:
-- Multiple NAT Gateways for HA
-- Larger RDS instance with Multi-AZ
-- Deletion protection enabled
-- Enhanced monitoring
-- Restricted network access
-- Auto-generated secrets unique to production environment
-
-### Multi-Environment Workflow
-
-```bash
-# Deploy to development
-terraform workspace select dev
-terraform apply -var-file="environments/dev/terraform.tfvars"
-
-# Test and validate changes
-
-# Deploy to staging
-terraform workspace select staging
-terraform apply -var-file="environments/staging/terraform.tfvars"
-
-# Final validation
-
-# Deploy to production
-terraform workspace select prod
-terraform apply -var-file="environments/prod/terraform.tfvars"
-```
-
-## Configuration Options
-
-### LiteLLM Configuration
-
-The deployment supports LiteLLM configuration through multiple methods:
-
-#### 1. Configuration File (Primary Method)
-The main configuration is managed via `examples/litellm-config.yaml`:
-
-```yaml
-# examples/litellm-config.yaml
-model_list:
-  - model_name: gpt-4o
-    litellm_params:
-      model: openai/gpt-4o
-      api_key: os.environ/OPENAI_API_KEY
-
-general_settings:
-  master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/DATABASE_URL
-  set_verbose: false
-  json_logs: true
-```
-
-**Update workflow:**
-```bash
-# 1. Edit the config file
-vim examples/litellm-config.yaml
-
-# 2. Deploy changes (automatically uploads to S3 and redeploys ECS)
-terraform apply
-```
-
-#### 2. Environment Variables
-Additional runtime configuration via terraform.tfvars:
-
-```hcl
-environment_variables = {
-  LITELLM_LOG_LEVEL     = "INFO"
-  LITELLM_DROP_PARAMS   = "true"
-  LITELLM_REQUEST_TIMEOUT = "600"
-}
-```
-
-#### 3. API Keys via SSM
-Add provider API keys securely:
-
-```hcl
-additional_ssm_parameters = {
-  "openai-api-key" = {
-    value       = "sk-your-openai-api-key"
-    type        = "SecureString"
-    description = "OpenAI API Key for LiteLLM"
-  }
-}
-```
-
-### Secret Management
-
-All core secrets are automatically generated:
-
-- **LiteLLM Master Key**: Format `sk-{48 alphanumeric chars}` - auto-generated
-- **LiteLLM Salt Key**: 32-byte base64-encoded key for AES-256 - auto-generated  
-- **Database Password**: 32-char RDS-compliant password - auto-generated
-
-Retrieve secrets after deployment:
-
-```bash
-# Get master key for API authentication
-terraform output -raw litellm_master_key
-
-# Get SSM parameter names for external access
-terraform output secret_retrieval_commands
-
-# Note: Configuration is managed in separate litellm-app repository
-```
-
-### Configuration Management
-
-Configuration is now managed via the separate litellm-app repository:
-
-- **Container-Based Config**: Configuration and guardrails baked into custom container
-- **Version Control**: Container tags track configuration versions
-- **Zero Downtime**: Rolling updates when new container versions are deployed
-- **Separation of Concerns**: App team manages configuration, platform team manages infrastructure
-
-### Scaling Configuration
-
-Configure ECS autoscaling:
-
-```hcl
-ecs_desired_count      = 3
-ecs_min_capacity       = 2
-ecs_max_capacity       = 20
-ecs_enable_autoscaling = true
-```
-
-### Database Configuration
-
-Configure RDS settings:
-
-```hcl
-db_instance_class          = "db.r6g.large"
-db_allocated_storage       = 100
-db_max_allocated_storage   = 1000
-db_multi_az               = true
-db_backup_retention_period = 30
-```
-
-## Security Considerations
-
-### Network Security
-
-- ECS tasks run in private subnets with no direct internet access
-- RDS runs in isolated database subnets
-- Security groups restrict access between components
-- ALB is the only internet-facing component
-
-### Secrets Management
-
-- All secrets auto-generated using Terraform random provider
-- Database passwords, LiteLLM keys stored in SSM Parameter Store as SecureString
-- Secrets are unique per environment and cryptographically secure
-- IAM roles follow principle of least privilege
-- No manual secret management required
-
-### Access Control
-
-```hcl
-# Restrict ALB access by IP
-allowed_cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]
-
-# Enable deletion protection in production
-alb_enable_deletion_protection = true
-db_deletion_protection        = true
-```
-
-## Monitoring and Logging
-
-### CloudWatch Logs
-
-- ECS task logs: `/ecs/{name_prefix}`
-- Application logs automatically streamed to CloudWatch
-
-### Monitoring
-
-- ECS Container Insights enabled
-- RDS Enhanced Monitoring (optional)
-- ALB access logs (optional)
-
-### Health Checks
-
-- ALB health checks on `/health` endpoint
-- ECS health checks with configurable thresholds
-- Auto-scaling based on CPU and memory utilization
-
-## Troubleshooting
-
-### Common Issues
-
-1. **ECS Tasks Not Starting**
-   ```bash
-   # Check ECS service events
-   aws ecs describe-services --cluster $(terraform output -raw ecs_cluster_name) --services $(terraform output -raw ecs_service_name)
-   
-   # Check CloudWatch logs
-   aws logs tail $(terraform output -raw ecs_log_group_name) --follow
-   ```
-
-2. **Database Connection Issues**
-   ```bash
-   # Verify database endpoint
-   terraform output database_endpoint
-   
-   # Check security group rules
-   aws ec2 describe-security-groups --group-ids $(terraform output -raw rds_security_group_id)
-   ```
-
-3. **ALB Health Check Failures**
-   ```bash
-   # Check target group health
-   aws elbv2 describe-target-health --target-group-arn $(terraform output -raw alb_target_group_arn)
-   ```
-
-### Debugging
-
-Enable ECS Exec for debugging:
-
-```hcl
-ecs_enable_execute_command = true
-```
-
-Then connect to a running task:
-
-```bash
-aws ecs execute-command \
+# Check multi-container task status
+aws ecs describe-services \
   --cluster $(terraform output -raw ecs_cluster_name) \
-  --task <task-id> \
-  --container litellm \
-  --interactive \
-  --command "/bin/bash"
+  --services $(terraform output -raw ecs_service_name)
+
+# Check individual container health
+aws ecs describe-tasks \
+  --cluster $(terraform output -raw ecs_cluster_name) \
+  --tasks $(aws ecs list-tasks --cluster $(terraform output -raw ecs_cluster_name) --query 'taskArns[0]' --output text)
 ```
 
-## Cleanup
+## 🔍 Monitoring and Debugging
 
-To destroy the infrastructure:
+### **CloudWatch Logs:**
+- **LiteLLM logs**: `/ecs/litellm-dev-ci` → `litellm/litellm/task-id`
+- **Ollama logs**: `/ecs/litellm-dev-ci` → `ollama/ollama/task-id`
 
+### **Common Commands:**
 ```bash
-# Review what will be destroyed
-terraform plan -destroy
+# View recent logs
+aws logs tail $(terraform output -raw ecs_log_group_name) --follow
 
-# Destroy the infrastructure
-terraform destroy
+# Check Ollama model status
+aws logs filter-log-events \
+  --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --filter-pattern "Model pulled successfully"
+
+# Debug container connectivity
+aws logs filter-log-events \
+  --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --filter-pattern "localhost:11434"
 ```
 
-**Note**: If deletion protection is enabled, you'll need to disable it first or use the `-target` flag to destroy specific resources.
+## 🔧 Environment Management
 
-## Cost Optimization
+### **Workspace-Based Deployment:**
+```bash
+# Development environment (manual)
+terraform workspace select dev
+terraform apply -var-file="environments/dev/terraform.tfvars"
 
-### Development Environment
+# CI/CD environment (automated)
+# Uses dev-ci workspace via GitHub Actions
+```
 
-- Use `single_nat_gateway = true`
-- Use smaller instance types (`db.t3.micro`, `ecs_cpu = 256`)
-- Disable Multi-AZ for RDS
-- Set shorter backup retention periods
+### **Environment Isolation:**
+- **dev**: Manual development and testing
+- **dev-ci**: Automated CI/CD deployments
+- **staging**: Pre-production validation
+- **prod**: Production environment
 
-### Production Environment
+## 🛠️ Troubleshooting
 
-- Use appropriate instance sizes based on load
-- Enable Multi-AZ for high availability
-- Use Reserved Instances for predictable workloads
-- Monitor and adjust auto-scaling thresholds
+### **Common Issues:**
 
-## Contributing
+1. **503/502 Errors**: Container startup or health check issues
+2. **401 Unauthorized**: Health endpoint requires authentication
+3. **Ollama connection**: Check localhost:11434 configuration
+4. **Model inference**: Verify llama3.2:3b model is pulled
+
+### **Debug Commands:**
+```bash
+# Check container status
+aws ecs describe-tasks --cluster $(terraform output -raw ecs_cluster_name) \
+  --tasks $(aws ecs list-tasks --cluster $(terraform output -raw ecs_cluster_name) --query 'taskArns[0]' --output text)
+
+# View container logs
+aws logs get-log-events --log-group-name $(terraform output -raw ecs_log_group_name) \
+  --log-stream-name "ollama/ollama/task-id"
+```
+
+## 💰 Cost Optimization
+
+### **Development Optimizations:**
+- Single NAT Gateway (vs. multiple)
+- db.t3.micro RDS instance
+- Single AZ deployment
+- No deletion protection
+- IP-restricted access
+
+### **Resource Scaling:**
+Adjust based on usage:
+```hcl
+# For lighter workloads
+ecs_cpu    = 1024
+ecs_memory = 4096
+
+# For heavier workloads  
+ecs_cpu    = 4096
+ecs_memory = 8192
+```
+
+## 🔐 Security Best Practices
+
+1. **Automated secret generation** with cryptographic strength
+2. **IP-based access restrictions** via security groups
+3. **Private subnet deployment** for containers
+4. **Encrypted storage** for RDS and SSM parameters
+5. **Least-privilege IAM policies**
+6. **Container security scanning** via ECR
+7. **Network isolation** between components
+
+## 📚 Related Documentation
+
+- **Detailed Deployment Guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md)
+- **LiteLLM Documentation**: https://docs.litellm.ai/
+- **Ollama Documentation**: https://ollama.ai/
+- **AWS ECS Documentation**: https://docs.aws.amazon.com/ecs/
+- **Terraform AWS Provider**: https://registry.terraform.io/providers/hashicorp/aws/
+
+## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Test in a development environment
+3. Test changes in development environment
+4. Update documentation if needed
 5. Submit a pull request
 
-## License
+## 📄 License
 
 [Add your license information here]
 
-## Support
+---
 
-For issues related to:
-- **Infrastructure**: Create an issue in this repository
-- **LiteLLM**: See [LiteLLM documentation](https://docs.litellm.ai/)
-- **AWS Services**: Consult AWS documentation
-
-## References
-
-- [LiteLLM Documentation](https://docs.litellm.ai/)
-- [LiteLLM Docker Deployment](https://docs.litellm.ai/docs/proxy/deploy)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [AWS ECS Documentation](https://docs.aws.amazon.com/ecs/)
-- [AWS RDS Documentation](https://docs.aws.amazon.com/rds/)
+**Built for production. Optimized for AI workloads. Secured by design.** 🚀
