@@ -329,7 +329,7 @@ graph LR
 graph TB
     subgraph "Client Request"
         Client[📱 Client Application]
-        Request[HTTP Request<br/>model: "gpt-4o-mini"]
+        Request[HTTP Request<br/>model gpt-4o-mini]
     end
 
     subgraph "LiteLLM Proxy Layer"
