@@ -27,7 +27,7 @@ variable "target_port" {
 variable "health_check_path" {
   description = "Health check path"
   type        = string
-  default     = "/health"
+  default     = "/health/readiness"
 }
 
 variable "health_check_interval" {
