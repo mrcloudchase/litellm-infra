@@ -44,8 +44,8 @@ db_deletion_protection    = false  # Allow deletion in dev
 db_skip_final_snapshot    = true   # Skip snapshot for dev
 
 # ECS Configuration
-ecs_cpu                   = 2048  # Increased for Ollama model serving
-ecs_memory               = 6144   # Increased for llama3.2:3b model (~3GB + overhead)
+ecs_cpu                   = 512   # Standard for single LiteLLM container
+ecs_memory               = 1024   # Standard for LiteLLM without Ollama
 ecs_desired_count        = 1
 ecs_min_capacity         = 1
 ecs_max_capacity         = 3
