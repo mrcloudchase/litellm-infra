@@ -27,7 +27,7 @@ allowed_cidr_blocks = ["68.76.147.104/32"]  # Restrict to your IP only
 
 # LiteLLM Configuration
 litellm_port    = 4000
-container_image = "734184332381.dkr.ecr.us-east-1.amazonaws.com/litellm-guardrails:latest"  # Custom ECR image with PII guardrails
+container_image = "PLACEHOLDER_REPLACED_BY_GITHUB_ACTIONS"  # Dynamically set by CI/CD workflow
 
 # Database Configuration
 database_name     = "litellm"
