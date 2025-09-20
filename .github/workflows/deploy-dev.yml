@@ -132,7 +132,7 @@ jobs:
           
           # Wait for service to be healthy (up to 5 minutes)
           for i in {1..30}; do
-            if curl -f "$ALB_URL/health" --connect-timeout 10 --max-time 30; then
+            if curl -f "$ALB_URL/health/readiness" --connect-timeout 10 --max-time 30; then
               echo "Health check passed!"
               break
             else

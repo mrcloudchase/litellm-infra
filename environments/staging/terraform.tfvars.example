@@ -52,7 +52,7 @@ ecs_enable_autoscaling   = true
 ecs_enable_execute_command = true
 
 # ALB Configuration
-health_check_path                = "/health"
+health_check_path                = "/health/readiness"
 health_check_interval           = 30
 health_check_timeout            = 5
 health_check_healthy_threshold  = 2
