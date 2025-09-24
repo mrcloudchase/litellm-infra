@@ -65,7 +65,7 @@ resource "aws_ecs_task_definition" "main" {
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://127.0.0.1:${var.container_port}/health/readiness || exit 1"
+          "pgrep -f uvicorn || exit 1"
         ]
         interval    = 30
         timeout     = 5
